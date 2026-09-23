@@ -1,5 +1,7 @@
 import { VW, VH, SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount } from "./content.js";
 
+const LEVELS = 3;
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -86,7 +88,8 @@ export class Game {
     const atk = 1 + this.meta.atk * 0.12;
     const hp = 220 + this.meta.hp * 40;
     this.run = {
-      chapter: this.meta.chapter,
+      level: 1,
+      chapter: 1,
       wave: 1,
       kills: 0,
       coins: 0,
@@ -464,13 +467,37 @@ export class Game {
     this.run.fx.push({ kind: "ring", x, y, r: 8, max: 48, life: 0.25, color });
   }
 
+  advanceLevel() {
+    const r = this.run;
+    if (r.level >= LEVELS) {
+      this.end(true);
+      return;
+    }
+    r.level += 1;
+    r.chapter = r.level;
+    r.wave = 1;
+    r.tower.hp = r.tower.maxHp;
+    r.enemies = [];
+    r.bullets = [];
+    r.spawnQueue = [];
+    r.combo = 0;
+    r.comboType = null;
+    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, r.level);
+    this.ui.save();
+    this.ui.updateHud(r);
+    this.ui.toast(`УРОВЕНЬ ${r.level}`);
+    this.audio.win();
+    this.queueWave();
+  }
+
   end(win) {
     this.state = "result";
     this.run.won = win;
-    const gain = this.run.coins + (win ? 40 : 0) + this.run.wave * 3;
+    const progress = (this.run.level - 1) * 6 + this.run.wave;
+    const gain = this.run.coins + (win ? 40 : 0) + progress;
     this.meta.coins += gain;
-    this.meta.bestWave = Math.max(this.meta.bestWave, this.run.wave);
-    if (win) this.meta.chapter += 1;
+    this.meta.bestWave = Math.max(this.meta.bestWave, progress);
+    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, win ? LEVELS : this.run.level);
     this.ui.save();
     this.ui.showResult(win, this.run, gain);
     win ? this.audio.win() : this.audio.lose();
@@ -574,7 +601,7 @@ export class Game {
       r.wavePause += dt;
       if (r.wavePause > 1.15) {
         if (r.wave === 6) {
-          this.end(true);
+          this.advanceLevel();
           this.draw(dt);
           return;
         }

@@ -60,9 +60,9 @@ const ui = {
     $("screen-result").classList.remove("hidden");
     $("result-title").textContent = win ? "ГЛАВА УДЕРЖАНА" : "ЯДРО ПАЛО";
     $("result-sub").textContent = win
-      ? "Босс разбит. Ядро усилилось для следующей главы."
-      : "Фигуры прорвались. Улучши ангар и вернись.";
-    $("result-wave").textContent = String(run.wave);
+      ? "Все 3 уровня пройдены. Сборка сохранила ядро до конца."
+      : `Уровень ${run.level} не удержан. Улучши ангар и вернись.`;
+    $("result-wave").textContent = String(run.level);
     $("result-kills").textContent = String(run.kills);
     $("result-coins").textContent = `+${gain}`;
   },
@@ -71,7 +71,7 @@ const ui = {
     el.textContent = text;
     el.classList.remove("hidden");
     clearTimeout(ui._t);
-    ui._t = setTimeout(() => el.classList.add("hidden"), 900);
+    ui._t = setTimeout(() => el.classList.add("hidden"), 1400);
   },
 };
 
@@ -85,7 +85,7 @@ function hideAll() {
 
 function refreshMenu() {
   $("menu-best").textContent = String(meta.bestWave);
-  $("menu-chapter").textContent = String(meta.chapter);
+  $("menu-chapter").textContent = String(meta.bestLevel || 1);
   $("menu-coins").textContent = String(meta.coins);
 }
 

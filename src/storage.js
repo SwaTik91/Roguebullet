@@ -4,6 +4,7 @@ const DEFAULTS = {
   coins: 0,
   bestWave: 0,
   chapter: 1,
+  bestLevel: 1,
   atk: 0,
   hp: 0,
   charge: 0,
