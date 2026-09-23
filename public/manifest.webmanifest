@@ -1,0 +1,13 @@
+{
+  "name": "PolySpire",
+  "short_name": "PolySpire",
+  "description": "Roguelike defense of a geometric core.",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05060c",
+  "theme_color": "#05060c",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

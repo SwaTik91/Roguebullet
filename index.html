@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#05060c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>PolySpire</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Orbitron:wght@600;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+
+      <div id="hud" class="hidden">
+        <div class="hud-top">
+          <div class="hud-chip">
+            <span>ВОЛНА</span>
+            <b id="hud-wave">1</b>
+          </div>
+          <div class="hud-chip">
+            <span>ГЛАВА</span>
+            <b id="hud-chapter">1</b>
+          </div>
+          <div class="hud-chip gold">
+            <span>МОНЕТЫ</span>
+            <b id="hud-coins">0</b>
+          </div>
+          <div class="hud-chip">
+            <span>КРИТ</span>
+            <b id="hud-crit">8%</b>
+          </div>
+        </div>
+        <div id="combo" class="combo hidden">
+          <em>РЕЗОНАНС</em>
+          <strong id="combo-text">△ × 3</strong>
+        </div>
+        <div id="weapons" class="weapons"></div>
+      </div>
+
+      <div id="screen-menu" class="screen">
+        <div class="logo">
+          <div class="logo-mark" aria-hidden="true"></div>
+          <h1>POLY<span>SPIRE</span></h1>
+          <p>Грань. Ядро. Удержи.</p>
+        </div>
+        <div class="menu-stats">
+          <div><span>Рекорд</span><b id="menu-best">0</b></div>
+          <div><span>Глава</span><b id="menu-chapter">1</b></div>
+          <div><span>Монеты</span><b id="menu-coins">0</b></div>
+        </div>
+        <button class="btn primary" id="btn-play">В БОЙ</button>
+        <button class="btn" id="btn-hangar">АНГАР</button>
+        <button class="btn ghost" id="btn-how">КАК ИГРАТЬ</button>
+        <button class="btn ghost" id="btn-settings">НАСТРОЙКИ</button>
+      </div>
+
+      <div id="screen-hangar" class="screen hidden">
+        <h2>АНГАР</h2>
+        <p class="sub">Постоянные усилители между вылетами.</p>
+        <div class="coins-line">Доступно: <b id="hangar-coins">0</b></div>
+        <div class="upgrade-list" id="hangar-list"></div>
+        <button class="btn" id="btn-hangar-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-how" class="screen hidden">
+        <h2>КАК ИГРАТЬ</h2>
+        <ul class="how">
+          <li><b>Ядро в центре</b> — стоит на месте, пулемёт крутится на 360°.</li>
+          <li><b>Автонаводка</b> — без пальца всегда берёт ближайшую фигуру.</li>
+          <li><b>Удерживай палец</b> — ручной прицел, больше урона.</li>
+          <li><b>Крит</b> — с шанса бьёт вдвое сильнее. Карты поднимают шанс.</li>
+          <li><b>Враги со всех сторон</b> — сверху, снизу, слева и справа.</li>
+          <li><b>Резонанс форм</b> — серия убийств одного типа взрывает призму.</li>
+          <li><b>Карты</b> — после уровня выбирай оружие или усилитель. Складывай одну линию.</li>
+        </ul>
+        <button class="btn primary" id="btn-how-back">ПОНЯТНО</button>
+      </div>
+
+      <div id="screen-settings" class="screen hidden">
+        <h2>НАСТРОЙКИ</h2>
+        <p class="sub">Можно менять прямо между боями.</p>
+        <button class="btn" id="btn-damage-toggle">ПОКАЗ УРОНА: ВКЛ</button>
+        <p class="sub">Цифры урона над врагами. Крит подсвечен золотом.</p>
+        <button class="btn" id="btn-settings-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-cards" class="screen dim hidden">
+        <h2>УСИЛЕНИЕ</h2>
+        <p class="sub">Выбери одну карту</p>
+        <div id="card-row" class="card-row"></div>
+      </div>
+
+      <div id="screen-result" class="screen hidden">
+        <h2 id="result-title">ЯДРО ПАЛО</h2>
+        <p id="result-sub" class="sub"></p>
+        <div class="result-grid">
+          <div><span>Волна</span><b id="result-wave">0</b></div>
+          <div><span>Убито</span><b id="result-kills">0</b></div>
+          <div><span>Монеты</span><b id="result-coins">0</b></div>
+        </div>
+        <button class="btn primary" id="btn-again">ЕЩЁ РАЗ</button>
+        <button class="btn" id="btn-result-menu">В МЕНЮ</button>
+      </div>
+
+      <div id="toast" class="toast hidden"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
