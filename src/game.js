@@ -1,4 +1,4 @@
-import { VW, VH, SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount } from "./content.js";
+import { SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount } from "./content.js";
 
 const LEVELS = 3;
 
@@ -23,33 +23,41 @@ export class Game {
     this.scale = 1;
     this.ox = 0;
     this.oy = 0;
-    this.stars = Array.from({ length: 70 }, () => ({
-      x: Math.random() * VW,
-      y: Math.random() * VH,
-      s: Math.random() * 1.6 + 0.3,
-      a: Math.random() * 0.5 + 0.15,
-    }));
-    this.pointer = { down: false, x: VW / 2, y: 200 };
+    this.worldW = 720;
+    this.worldH = 1280;
+    this.stars = [];
+    this.pointer = { down: false, x: 360, y: 200 };
     this.shake = 0;
     this.state = "boot";
     this.resize();
     window.addEventListener("resize", () => this.resize());
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", () => this.resize());
+      window.visualViewport.addEventListener("scroll", () => this.resize());
+    }
     this.bindInput();
   }
 
   resize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const vv = window.visualViewport;
+    const w = Math.max(1, vv?.width || window.innerWidth);
+    const h = Math.max(1, vv?.height || window.innerHeight);
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.canvas.width = Math.floor(w * this.dpr);
     this.canvas.height = Math.floor(h * this.dpr);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
-    const sx = w / VW;
-    const sy = h / VH;
-    this.scale = Math.min(sx, sy);
-    this.ox = (w - VW * this.scale) / 2;
-    this.oy = (h - VH * this.scale) / 2;
+    this.worldH = 1280;
+    this.worldW = 1280 * (w / h);
+    this.scale = h / this.worldH;
+    this.ox = 0;
+    this.oy = 0;
+    this.stars = Array.from({ length: 80 }, () => ({
+      x: Math.random() * this.worldW,
+      y: Math.random() * this.worldH,
+      s: Math.random() * 1.6 + 0.3,
+      a: Math.random() * 0.5 + 0.15,
+    }));
   }
 
   toVirtual(clientX, clientY) {
@@ -117,7 +125,7 @@ export class Game {
         cd: 0,
       },
       crit: { chance: 0.08, mul: 2 },
-      tower: { x: VW / 2, y: VH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 },
+      tower: { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 },
       enemies: [],
       bullets: [],
       fx: [],
@@ -162,17 +170,17 @@ export class Game {
       x = at.x + (Math.random() - 0.5) * 30;
       y = at.y + (Math.random() - 0.5) * 30;
     } else if (side === 0) {
-      x = 40 + Math.random() * (VW - 80);
+      x = 40 + Math.random() * (this.worldW - 80);
       y = -36;
     } else if (side === 1) {
-      x = 40 + Math.random() * (VW - 80);
-      y = VH + 36;
+      x = 40 + Math.random() * (this.worldW - 80);
+      y = this.worldH + 36;
     } else if (side === 2) {
       x = -36;
-      y = 40 + Math.random() * (VH - 80);
+      y = 40 + Math.random() * (this.worldH - 80);
     } else {
-      x = VW + 36;
-      y = 40 + Math.random() * (VH - 80);
+      x = this.worldW + 36;
+      y = 40 + Math.random() * (this.worldH - 80);
     }
     this.run.enemies.push({
       ...def,
@@ -523,8 +531,8 @@ export class Game {
     const r = this.run;
     const tw = r.tower;
 
-    tw.x = VW / 2;
-    tw.y = VH / 2;
+    tw.x = this.worldW / 2;
+    tw.y = this.worldH / 2;
 
     const focused = this.pointer.down;
     let targetAng = r.gun.angle;
@@ -661,8 +669,8 @@ export class Game {
       b.y += b.vy * dt;
       b.life -= dt;
       if (b.bounce) {
-        if (b.x < 8 || b.x > VW - 8) b.vx *= -1;
-        if (b.y < 8 || b.y > VH - 8) b.vy *= -1;
+        if (b.x < 8 || b.x > this.worldW - 8) b.vx *= -1;
+        if (b.y < 8 || b.y > this.worldH - 8) b.vy *= -1;
       }
       if (b.kind === "nade" && (b.life < 0.05 || this.hitAny(b))) {
         this.explode(b.x, b.y, b.radius, b.dmg);
@@ -692,7 +700,7 @@ export class Game {
       }
     }
 
-    r.bullets = r.bullets.filter((b) => b.life > 0 && b.x > -40 && b.x < VW + 40 && b.y > -40 && b.y < VH + 40);
+    r.bullets = r.bullets.filter((b) => b.life > 0 && b.x > -40 && b.x < this.worldW + 40 && b.y > -40 && b.y < this.worldH + 40);
     r.enemies = r.enemies.filter((e) => !e.dead);
     for (const f of r.fx) {
       f.life -= dt;
@@ -725,7 +733,7 @@ export class Game {
     ctx.setTransform(this.scale * this.dpr, 0, 0, this.scale * this.dpr, (this.ox + shx / this.dpr) * this.dpr, (this.oy + shy / this.dpr) * this.dpr);
 
     ctx.fillStyle = "#070814";
-    ctx.fillRect(0, 0, VW, VH);
+    ctx.fillRect(0, 0, this.worldW, this.worldH);
     for (const s of this.stars) {
       ctx.globalAlpha = s.a;
       ctx.fillStyle = "#9bb6ff";
@@ -734,10 +742,10 @@ export class Game {
     ctx.globalAlpha = 1;
     ctx.strokeStyle = "rgba(90,120,200,0.07)";
     ctx.lineWidth = 1;
-    for (let y = 40; y < VH; y += 48) {
+    for (let y = 40; y < this.worldH; y += 48) {
       ctx.beginPath();
       ctx.moveTo(0, y);
-      ctx.lineTo(VW, y);
+      ctx.lineTo(this.worldW, y);
       ctx.stroke();
     }
 
