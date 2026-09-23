@@ -1,0 +1,12 @@
+[Unit]
+Description=Roguebullet account API
+After=network.target
+
+[Service]
+WorkingDirectory=/var/www/roguebullet-src
+ExecStart=/usr/bin/python3 -m server.app --host 0.0.0.0 --port 8080 --db /var/lib/roguebullet/account.sqlite
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
