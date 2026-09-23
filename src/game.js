@@ -127,6 +127,8 @@ export class Game {
       comboType: null,
       combo: 0,
       comboFlash: 0,
+      bossIntro: 0,
+      bossPulse: 0,
       overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85 },
       weapons: { gun: true },
       wepStats: {},
@@ -182,17 +184,33 @@ export class Game {
   queueWave() {
     const { wave, chapter } = this.run;
     this.run.spawnQueue = [];
-    if (wave % 6 === 0) {
-      this.run.spawnQueue.push(enemyForWave(wave, chapter));
-      const escorts = 26 + chapter * 8;
-      for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter));
-    } else {
-      const n = waveCount(wave);
-      for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(wave, chapter));
-    }
-    this.run.spawnTimer = 0.45;
     this.run.wavePause = 0;
+    if (wave % 6 === 0) {
+      this.run.bossIntro = 2.6;
+      this.run.bossPulse = 0;
+      this.shake = 12;
+      this.audio.overdrive();
+      this.ui.updateHud(this.run);
+      return;
+    }
+    const n = waveCount(wave);
+    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(wave, chapter));
+    this.run.spawnTimer = 0.45;
     this.ui.updateHud(this.run);
+  }
+
+  releaseBoss() {
+    const { wave, chapter } = this.run;
+    this.run.spawnQueue = [enemyForWave(wave, chapter)];
+    const escorts = 26 + chapter * 8;
+    for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter));
+    this.run.spawnTimer = 0.2;
+    this.shake = 18;
+    this.audio.boom();
+    const cx = this.worldW / 2;
+    const cy = this.worldH / 2;
+    this.run.fx.push({ kind: "ring", x: cx, y: cy, r: 30, max: Math.max(this.worldW, this.worldH), life: 0.7, color: "#ff5d9a" });
+    this.run.fx.push({ kind: "ring", x: cx, y: cy, r: 10, max: 220, life: 0.45, color: "#ffe08a" });
   }
 
   spawnGap() {
@@ -220,6 +238,10 @@ export class Game {
     } else {
       x = this.worldW + 36;
       y = 40 + Math.random() * (this.worldH - 80);
+    }
+    if (def.boss) {
+      this.shake = Math.max(this.shake, 14);
+      this.run.fx.push({ kind: "ring", x, y, r: 16, max: def.r * 3.2, life: 0.55, color: def.color });
     }
     this.run.enemies.push({
       ...def,
@@ -681,7 +703,18 @@ export class Game {
       }
     }
 
-    if (r.spawnQueue.length) {
+    if (r.bossIntro > 0) {
+      r.bossIntro -= dt;
+      r.bossPulse -= dt;
+      this.shake = Math.max(this.shake, 6);
+      if (r.bossPulse <= 0) {
+        r.bossPulse = 0.42;
+        const cx = this.worldW / 2;
+        const cy = this.worldH / 2;
+        this.run.fx.push({ kind: "ring", x: cx, y: cy, r: 24, max: 340, life: 0.5, color: "#ff5d9a" });
+      }
+      if (r.bossIntro <= 0) this.releaseBoss();
+    } else if (r.spawnQueue.length) {
       r.spawnTimer -= dt;
       if (r.spawnTimer <= 0) {
         this.spawnEnemy(r.spawnQueue.shift());
@@ -863,6 +896,36 @@ export class Game {
     }
 
     this.drawTower(ctx);
+    if (this.run.bossIntro > 0) this.drawBossIntro(ctx);
+  }
+
+  drawBossIntro(ctx) {
+    const t = this.run.bossIntro;
+    const pulse = 0.5 + 0.5 * Math.sin((2.6 - t) * 16);
+    const cx = this.worldW / 2;
+    const cy = this.worldH / 2;
+    ctx.save();
+    ctx.fillStyle = `rgba(80, 0, 30, ${0.28 + pulse * 0.18})`;
+    ctx.fillRect(0, 0, this.worldW, this.worldH);
+    ctx.strokeStyle = "#ff5d9a";
+    ctx.lineWidth = 10;
+    ctx.globalAlpha = 0.45 + pulse * 0.4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 90 + pulse * 70, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffe08a";
+    ctx.font = `800 ${92 + pulse * 22}px Manrope, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "#ff4d88";
+    ctx.shadowBlur = 32;
+    ctx.fillText("БОСС", cx, cy);
+    ctx.font = "700 28px Manrope, sans-serif";
+    ctx.fillStyle = "#ffd0e2";
+    ctx.shadowBlur = 0;
+    ctx.fillText("ВОЛНА 6", cx, cy + 78);
+    ctx.restore();
   }
 
   drawTower(ctx) {
@@ -916,7 +979,13 @@ export class Game {
     ctx.fillStyle = e.color;
     ctx.strokeStyle = e.color;
     ctx.shadowColor = e.color;
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = e.boss ? 22 : 8;
+    if (e.boss) {
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r + 10, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     if (e.type === "circle") {
       ctx.beginPath();
       ctx.arc(0, 0, e.r, 0, Math.PI * 2);

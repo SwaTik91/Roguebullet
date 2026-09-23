@@ -164,7 +164,7 @@ export function enemyForWave(wave, chapter) {
       hp: 800 * scale,
       speed: 28,
       dmg: 18,
-      r: 42,
+      r: 78,
       color: "#f472b6",
       xp: 80,
       coins: 28,
