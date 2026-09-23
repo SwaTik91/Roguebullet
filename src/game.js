@@ -202,7 +202,7 @@ export class Game {
   releaseBoss() {
     const { wave, chapter } = this.run;
     this.run.spawnQueue = [enemyForWave(wave, chapter)];
-    const escorts = 26 + chapter * 8;
+    const escorts = (26 + chapter * 8) * 10;
     for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter));
     this.run.spawnTimer = 0.2;
     this.shake = 18;
@@ -717,7 +717,7 @@ export class Game {
     } else if (r.spawnQueue.length) {
       r.spawnTimer -= dt;
       if (r.spawnTimer <= 0) {
-        this.spawnEnemy(r.spawnQueue.shift());
+        for (let n = 0; n < 10 && r.spawnQueue.length; n++) this.spawnEnemy(r.spawnQueue.shift());
         r.spawnTimer = this.spawnGap();
       }
     } else if (!r.enemies.some((e) => !e.dead)) {

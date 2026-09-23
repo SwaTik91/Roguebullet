@@ -185,5 +185,5 @@ export function enemyForWave(wave, chapter) {
 
 export function waveCount(wave) {
   if (wave % 6 === 0) return 1;
-  return 40 + wave * 12;
+  return (40 + wave * 12) * 10;
 }
