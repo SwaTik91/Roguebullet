@@ -38,5 +38,54 @@ class RewardTests(unittest.TestCase):
         self.assertEqual((again, crystals2, autos2), ([], 0, []))
 
 
+class MetaTests(unittest.TestCase):
+    def test_daily_tasks_mark_done_and_claimed(self):
+        tasks = daily_tasks(40, True, False, {"wave3"})
+        by_id = {task["id"]: task for task in tasks}
+        self.assertEqual(by_id["wave3"], {"id": "wave3", "crystals": 2, "done": True, "claimed": True})
+        self.assertEqual(by_id["kills40"]["done"], True)
+        self.assertEqual(by_id["kills40"]["claimed"], False)
+        self.assertEqual(by_id["level"]["done"], False)
+
+    def test_ready_achievements_skip_claimed(self):
+        stats = {"kills": 100, "cleared_levels": {1}, "hangar_buys": 1, "chests": 0}
+        ready = ready_achievements(stats, {"first_blood"})
+        self.assertEqual(ready, ["first_boss", "kills_100", "hangar"])
+
+    def test_achievement_amounts(self):
+        self.assertEqual(achievement_crystals("three_levels"), 20)
+        self.assertEqual(achievement_crystals("chest"), 3)
+
+    def test_hangar_price_matches_existing_curve(self):
+        self.assertEqual(hangar_price(0), 40)
+        self.assertEqual(hangar_price(1), 66)
+
+    def test_shop_rejects_a_sixth_crit_and_a_repeat_weapon(self):
+        profile = {"crystals": 100, "crit_bonus": 10, "weapons": ["laser"], "fourth_card": False}
+        with self.assertRaises(ValueError):
+            buy_crystal_item(profile, "crit")
+        with self.assertRaises(ValueError):
+            buy_crystal_item(profile, "weapon", "laser")
+
+    def test_shop_buys_fourth_card_once(self):
+        profile = {"crystals": 50, "crit_bonus": 0, "weapons": [], "fourth_card": False}
+        bought = buy_crystal_item(profile, "fourth_card")
+        self.assertEqual(bought["crystals"], 0)
+        self.assertEqual(bought["fourth_card"], True)
+
+    def test_chest_omits_crit_at_the_cap_and_queues_a_known_card(self):
+        class Seq:
+            def __init__(self, values):
+                self.values = list(values)
+
+            def randrange(self, count):
+                return self.values.pop(0)
+
+        profile = {"crit_bonus": 10}
+        drop = roll_chest(profile, Seq([3, 1]))
+        self.assertEqual(drop["kind"], "card")
+        self.assertIn(drop["card"], ["Калибр", "Темп", "Сервопривод", "Пластины"])
+
+
 if __name__ == "__main__":
     unittest.main()
