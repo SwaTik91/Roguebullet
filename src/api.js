@@ -1,5 +1,22 @@
 const TOKEN_KEY = "roguebullet-token";
 
+export function newId(cryptoObj = globalThis.crypto) {
+  if (cryptoObj && typeof cryptoObj.randomUUID === "function") {
+    try {
+      return cryptoObj.randomUUID();
+    } catch {
+      // The game is served over plain HTTP, where some phones hide randomUUID.
+    }
+  }
+  const bytes = new Uint8Array(16);
+  if (cryptoObj && typeof cryptoObj.getRandomValues === "function") cryptoObj.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export function createApi({ base, storage, fetch: fetchImpl }) {
   const request = async (path, { method = "GET", body, auth = true } = {}) => {
     const headers = { "Content-Type": "application/json" };

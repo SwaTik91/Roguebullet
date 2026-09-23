@@ -3,7 +3,7 @@ import { Game, WEAPON_INFO } from "./game.js";
 import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
-import { api } from "./api.js";
+import { api, newId } from "./api.js";
 import { retryPendingClaims } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
@@ -275,13 +275,15 @@ function renderChest() {
   $("btn-chest-open").textContent = poor ? "НУЖНО 20" : "ОТКРЫТЬ";
 }
 
-$("btn-play").onclick = () => {
+function beginBattle() {
   if (!api.token()) return;
   audio.unlock();
   game.meta = meta;
   game.profile = profile;
-  game.startRun();
-};
+  Promise.resolve(game.startRun()).catch((error) => ui.toast(error.message || "Бой не запустился"));
+}
+
+$("btn-play").onclick = beginBattle;
 
 async function enter(mode) {
   const name = $("login-name").value.trim();
@@ -315,7 +317,7 @@ $("btn-chest").onclick = () => {
 };
 $("btn-chest-open").onclick = async () => {
   $("btn-chest-open").disabled = true;
-  const result = await purchase(() => api.openChest(crypto.randomUUID()), renderChest);
+  const result = await purchase(() => api.openChest(newId()), renderChest);
   if (result?.drop) $("chest-result").textContent = dropText(result.drop);
   renderChest();
 };
@@ -361,12 +363,8 @@ $("btn-how-back").onclick = () => {
   $("screen-menu").classList.remove("hidden");
 };
 $("btn-again").onclick = () => {
-  if (!api.token()) return;
-  audio.unlock();
   hideAll();
-  game.meta = meta;
-  game.profile = profile;
-  game.startRun();
+  beginBattle();
 };
 $("btn-result-menu").onclick = () => {
   $("hud").classList.add("hidden");

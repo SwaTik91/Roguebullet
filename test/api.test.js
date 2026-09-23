@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApi } from "../src/api.js";
+import { createApi, newId } from "../src/api.js";
+
+test("newId works when the page cannot use randomUUID", () => {
+  const id = newId({
+    randomUUID() {
+      throw new Error("insecure");
+    },
+    getRandomValues(bytes) {
+      bytes.fill(7);
+    },
+  });
+  assert.equal(id, "07070707-0707-4707-8707-070707070707");
+});
 
 test("login stores the token and me sends it", async () => {
   const saved = {};

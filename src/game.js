@@ -1,5 +1,5 @@
 import { SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount, defaultWep } from "./content.js";
-import { api } from "./api.js";
+import { api, newId } from "./api.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const CHEST_CARDS = {
@@ -111,7 +111,7 @@ export class Game {
     const atk = 1 + (hangar.atk || 0) * 0.12;
     const hp = 220 + (hangar.hp || 0) * 40;
     this.run = {
-      runId: crypto.randomUUID(),
+      runId: newId(),
       level: 1,
       chapter: 1,
       wave: 1,
