@@ -134,12 +134,24 @@ export class Game {
 
   queueWave() {
     const { wave, chapter } = this.run;
-    const n = waveCount(wave);
     this.run.spawnQueue = [];
-    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(wave, chapter));
-    this.run.spawnTimer = 0.15;
+    if (wave % 6 === 0) {
+      this.run.spawnQueue.push(enemyForWave(wave, chapter));
+      const escorts = 14 + chapter * 4;
+      for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter));
+    } else {
+      const n = waveCount(wave);
+      for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(wave, chapter));
+    }
+    this.run.spawnTimer = 0.45;
     this.run.wavePause = 0;
     this.ui.updateHud(this.run);
+  }
+
+  spawnGap() {
+    const wave = this.run.wave;
+    if (wave % 6 === 0) return 0.95;
+    return clamp(1.35 - wave * 0.08, 0.72, 1.45);
   }
 
   spawnEnemy(def, fromSplit, at) {
@@ -595,7 +607,7 @@ export class Game {
       r.spawnTimer -= dt;
       if (r.spawnTimer <= 0) {
         this.spawnEnemy(r.spawnQueue.shift());
-        r.spawnTimer = r.wave % 6 === 0 ? 0.2 : clamp(0.55 - r.wave * 0.02, 0.18, 0.7);
+        r.spawnTimer = this.spawnGap();
       }
     } else if (!r.enemies.some((e) => !e.dead)) {
       r.wavePause += dt;
