@@ -37,6 +37,14 @@ class RewardTests(unittest.TestCase):
         again, crystals2, autos2 = first_clear_crystals({1, 2, 3}, 3)
         self.assertEqual((again, crystals2, autos2), ([], 0, []))
 
+    def test_later_level_pays_only_after_earlier_ones(self):
+        levels, crystals, autos = first_clear_crystals(set(), 1, 3)
+        self.assertEqual((levels, crystals, autos), ([], 0, []))
+        levels, crystals, autos = first_clear_crystals({1}, 2, 2)
+        self.assertEqual(levels, [2, 3])
+        self.assertEqual(crystals, 12 + 20)
+        self.assertEqual(autos, ["three_levels"])
+
 
 class MetaTests(unittest.TestCase):
     def test_daily_tasks_mark_done_and_claimed(self):

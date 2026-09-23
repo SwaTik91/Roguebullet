@@ -11,9 +11,9 @@ ENEMY_COINS = {
 }
 
 
-def coin_reward(kills, ended_level, ended_wave, won):
+def coin_reward(kills, ended_level, ended_wave, won, started_level=1):
     total = sum(int(kills.get(kind, 0)) * coins for kind, coins in ENEMY_COINS.items())
-    total += (int(ended_level) - 1) * 6 + int(ended_wave)
+    total += (int(ended_level) - int(started_level)) * 6 + int(ended_wave)
     if won:
         total += 40
     return total
@@ -35,13 +35,26 @@ def apply_account_xp(level, xp, gained):
     return level, xp, crystals
 
 
-def first_clear_crystals(already, levels_cleared):
+def levels_in_run(started_level, levels_cleared, already):
+    owned = set(already)
+    played = []
+    for offset in range(int(levels_cleared)):
+        level = int(started_level) + offset
+        if level < 1 or level > 3:
+            break
+        if not set(range(1, level)).issubset(owned | set(played)):
+            break
+        played.append(level)
+    return played
+
+
+def first_clear_crystals(already, levels_cleared, started_level=1):
     owned = set(already)
     new_levels = []
     crystals = 0
     autos = []
     payout = {1: 8, 2: 12, 3: 20}
-    for level in range(1, int(levels_cleared) + 1):
+    for level in levels_in_run(started_level, levels_cleared, owned):
         if level in owned:
             continue
         new_levels.append(level)

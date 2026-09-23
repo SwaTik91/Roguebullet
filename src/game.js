@@ -105,15 +105,17 @@ export class Game {
     this.canvas.addEventListener("touchend", up);
   }
 
-  async startRun() {
+  async startRun(level = 1) {
     const profile = this.profile || {};
     const hangar = profile.hangar || { atk: 0, hp: 0, charge: 0 };
+    const startLevel = Math.min(3, Math.max(1, Number(level) || 1));
     const atk = 1 + (hangar.atk || 0) * 0.12;
     const hp = 220 + (hangar.hp || 0) * 40;
     this.run = {
       runId: newId(),
-      level: 1,
-      chapter: 1,
+      startedLevel: startLevel,
+      level: startLevel,
+      chapter: startLevel,
       wave: 1,
       kills: { circle: 0, triangle: 0, square: 0, hex: 0, diamond: 0, split: 0, boss: 0 },
       wavesCleared: 0,
@@ -555,6 +557,7 @@ export class Game {
   facts() {
     return {
       runId: this.run.runId,
+      startedLevel: this.run.startedLevel || 1,
       kills: { ...this.run.kills },
       wavesCleared: this.run.wavesCleared,
       levelsCleared: this.run.levelsCleared,

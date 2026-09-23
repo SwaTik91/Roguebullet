@@ -171,16 +171,17 @@ class Store:
             if existing:
                 self.db.commit()
                 return json.loads(existing["response_json"])
-            kills, levels_cleared, ended_level, ended_wave, waves_cleared, won = _validate_facts(facts)
+            kills, levels_cleared, ended_level, ended_wave, waves_cleared, started_level = _validate_facts(facts)
             row = self.db.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
-            coin_gain = coin_reward(kills, ended_level, ended_wave, won)
+            full_campaign = started_level == 1 and levels_cleared >= 3
+            coin_gain = coin_reward(kills, ended_level, ended_wave, full_campaign, started_level)
             xp_gain = xp_reward(kills, waves_cleared, levels_cleared)
             new_level, new_xp, level_crystals = apply_account_xp(row["account_level"], row["xp"], xp_gain)
             already = {
                 item["level"]
                 for item in self.db.execute("SELECT level FROM cleared_levels WHERE account_id = ?", (account_id,))
             }
-            new_levels, clear_crystals, autos = first_clear_crystals(already, levels_cleared)
+            new_levels, clear_crystals, autos = first_clear_crystals(already, levels_cleared, started_level)
             claimed = {
                 item["achievement_id"]
                 for item in self.db.execute(
@@ -575,19 +576,21 @@ def _validate_facts(facts):
         ended_level = int(facts["endedLevel"])
         ended_wave = int(facts["endedWave"])
         waves_cleared = int(facts["wavesCleared"])
-        won = bool(facts["won"])
+        started_level = int(facts.get("startedLevel") or 1)
         raw_kills = facts.get("kills") or {}
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("Некорректный забег") from exc
     if levels_cleared not in range(0, 4):
         raise ValueError("Некорректный забег")
-    if ended_level not in range(1, 4):
+    if started_level not in range(1, 4):
+        raise ValueError("Некорректный забег")
+    if levels_cleared and started_level + levels_cleared - 1 > 3:
+        raise ValueError("Некорректный забег")
+    if ended_level not in range(1, 4) or ended_level < started_level:
         raise ValueError("Некорректный забег")
     if ended_wave not in range(1, 7):
         raise ValueError("Некорректный забег")
     if waves_cleared not in range(0, 19):
-        raise ValueError("Некорректный забег")
-    if won and levels_cleared != 3:
         raise ValueError("Некорректный забег")
     kills = {}
     for kind in ENEMY_COINS:
@@ -598,4 +601,4 @@ def _validate_facts(facts):
         if count < 0:
             raise ValueError("Некорректный забег")
         kills[kind] = count
-    return kills, levels_cleared, ended_level, ended_wave, waves_cleared, won
+    return kills, levels_cleared, ended_level, ended_wave, waves_cleared, started_level

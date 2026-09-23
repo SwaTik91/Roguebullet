@@ -74,9 +74,12 @@ const ui = {
       $("result-crystals").textContent = "…";
       return;
     }
-    $("result-sub").textContent = win
+    const fullRun = win && (run.startedLevel || 1) === 1;
+    $("result-sub").textContent = fullRun
       ? "Все 3 уровня пройдены. Награда уже на аккаунте."
-      : `Уровень ${run.level} не удержан. Награда уже на аккаунте.`;
+      : win
+        ? `Уровень ${run.level} пройден. Награда уже на аккаунте.`
+        : `Уровень ${run.level} не удержан. Награда уже на аккаунте.`;
     $("result-coins").textContent = `+${granted.coins || 0}`;
     $("result-crystals").textContent = `+${granted.crystals || 0}`;
     ui.toast(`+${granted.coins || 0} монет, +${granted.crystals || 0} кристаллов`, 2600);
@@ -95,6 +98,7 @@ const game = new Game($("game"), ui, audio, meta);
 const SCREENS = [
   "screen-login",
   "screen-menu",
+  "screen-levels",
   "screen-hangar",
   "screen-shop",
   "screen-chest",
@@ -279,15 +283,47 @@ function renderChest() {
   $("btn-chest-open").textContent = poor ? "НУЖНО 20" : "ОТКРЫТЬ";
 }
 
-function beginBattle() {
+const LEVEL_CRYSTALS = { 1: 8, 2: 12, 3: 20 };
+
+function levelOpen(level) {
+  const cleared = new Set(profile?.clearedLevels || []);
+  return level === 1 || cleared.has(level - 1);
+}
+
+function renderLevels() {
+  const cleared = new Set(profile?.clearedLevels || []);
+  $("level-list").innerHTML = [1, 2, 3]
+    .map((level) => {
+      const open = levelOpen(level);
+      const done = cleared.has(level);
+      const note = !open
+        ? "Сначала пройди предыдущий"
+        : done
+          ? "Пройден. С него можно начать снова."
+          : `Первый раз: ${LEVEL_CRYSTALS[level]} кристаллов`;
+      return `<div class="upgrade"><div><strong>Уровень ${level}</strong><div class="sub">${note}</div></div><button data-level="${level}" ${open ? "" : "disabled"}>${open ? "В БОЙ" : "ЗАКРЫТ"}</button></div>`;
+    })
+    .join("");
+  $("level-list").querySelectorAll("button").forEach((btn) => {
+    btn.onclick = () => beginBattle(Number(btn.dataset.level));
+  });
+}
+
+function beginBattle(level = 1) {
   if (!api.token()) return;
+  if (!levelOpen(level)) return;
   audio.unlock();
   game.meta = meta;
   game.profile = profile;
-  Promise.resolve(game.startRun()).catch((error) => ui.toast(error.message || "Бой не запустился"));
+  Promise.resolve(game.startRun(level)).catch((error) => ui.toast(error.message || "Бой не запустился"));
 }
 
-$("btn-play").onclick = beginBattle;
+$("btn-play").onclick = () => {
+  if (!api.token()) return;
+  openScreen("screen-levels");
+  renderLevels();
+};
+$("btn-levels-back").onclick = () => showMenu();
 
 async function enter(mode) {
   const name = $("login-name").value.trim();
@@ -368,7 +404,7 @@ $("btn-how-back").onclick = () => {
 };
 $("btn-again").onclick = () => {
   hideAll();
-  beginBattle();
+  beginBattle(game.run?.startedLevel || 1);
 };
 $("btn-result-menu").onclick = () => {
   $("hud").classList.add("hidden");
