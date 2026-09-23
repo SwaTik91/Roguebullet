@@ -149,19 +149,19 @@ export function pickCards(run, n = 3) {
 }
 
 export function enemyForWave(wave, chapter) {
-  const scale = Math.pow(1.2, wave - 1) * (1 + (chapter - 1) * 0.28);
+  const scale = Math.pow(1.32, wave - 1) * (1 + (chapter - 1) * 0.42);
   const table = [
-    { type: "circle", hp: 22, speed: 58, dmg: 8, r: 16, color: "#7dd3fc", xp: 6, coins: 2 },
-    { type: "triangle", hp: 14, speed: 92, dmg: 7, r: 14, color: "#fbbf24", xp: 7, coins: 2, zigzag: true },
-    { type: "square", hp: 48, speed: 40, dmg: 14, r: 20, color: "#fb7185", xp: 10, coins: 3 },
-    { type: "hex", hp: 30, speed: 52, dmg: 9, r: 18, color: "#c084fc", xp: 11, coins: 3, split: 3 },
-    { type: "diamond", hp: 36, speed: 48, dmg: 10, r: 17, color: "#34d399", xp: 10, coins: 3, shield: 22 },
+    { type: "circle", hp: 40, speed: 58, dmg: 8, r: 16, color: "#7dd3fc", xp: 6, coins: 2 },
+    { type: "triangle", hp: 26, speed: 92, dmg: 7, r: 14, color: "#fbbf24", xp: 7, coins: 2, zigzag: true },
+    { type: "square", hp: 90, speed: 40, dmg: 14, r: 20, color: "#fb7185", xp: 10, coins: 3 },
+    { type: "hex", hp: 56, speed: 52, dmg: 9, r: 18, color: "#c084fc", xp: 11, coins: 3, split: 3 },
+    { type: "diamond", hp: 68, speed: 48, dmg: 10, r: 17, color: "#34d399", xp: 10, coins: 3, shield: 42 },
   ];
 
   if (wave % 6 === 0) {
     return {
       type: "boss",
-      hp: 420 * scale,
+      hp: 800 * scale,
       speed: 28,
       dmg: 18,
       r: 42,
@@ -185,5 +185,5 @@ export function enemyForWave(wave, chapter) {
 
 export function waveCount(wave) {
   if (wave % 6 === 0) return 1;
-  return 22 + wave * 7;
+  return 40 + wave * 12;
 }

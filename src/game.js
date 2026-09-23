@@ -184,7 +184,7 @@ export class Game {
     this.run.spawnQueue = [];
     if (wave % 6 === 0) {
       this.run.spawnQueue.push(enemyForWave(wave, chapter));
-      const escorts = 14 + chapter * 4;
+      const escorts = 26 + chapter * 8;
       for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter));
     } else {
       const n = waveCount(wave);
