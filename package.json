@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host --port 4173",
     "android:sync": "vite build && npx cap copy android",
-    "test": "node --test test/content.test.js"
+    "test": "node --test test/api.test.js"
   },
   "devDependencies": {
     "vite": "^6.2.0"

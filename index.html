@@ -50,19 +50,36 @@
         <div id="weapons" class="weapons"></div>
       </div>
 
-      <div id="screen-menu" class="screen">
+      <div id="screen-login" class="screen">
+        <div class="logo">
+          <div class="logo-mark" aria-hidden="true"></div>
+          <h1>POLY<span>SPIRE</span></h1>
+          <p>Аккаунт хранит монеты и кристаллы.</p>
+        </div>
+        <input class="field" id="login-name" maxlength="24" autocomplete="username" placeholder="Имя" />
+        <input class="field" id="login-password" type="password" maxlength="64" autocomplete="current-password" placeholder="Пароль" />
+        <p id="login-error" class="sub error"></p>
+        <button class="btn primary" id="btn-login">ВОЙТИ</button>
+        <button class="btn" id="btn-register">СОЗДАТЬ АККАУНТ</button>
+      </div>
+
+      <div id="screen-menu" class="screen hidden scroll">
         <div class="logo">
           <div class="logo-mark" aria-hidden="true"></div>
           <h1>POLY<span>SPIRE</span></h1>
           <p>Грань. Ядро. Удержи.</p>
         </div>
         <div class="menu-stats">
-          <div><span>Рекорд</span><b id="menu-best">0</b></div>
-          <div><span>Уровень</span><b id="menu-chapter">1</b></div>
+          <div><span>Аккаунт</span><b id="menu-account">1</b></div>
           <div><span>Монеты</span><b id="menu-coins">0</b></div>
+          <div><span>Кристаллы</span><b id="menu-crystals">0</b></div>
         </div>
         <button class="btn primary" id="btn-play">В БОЙ</button>
         <button class="btn" id="btn-hangar">АНГАР</button>
+        <button class="btn" id="btn-shop">КРИСТАЛЛЫ</button>
+        <button class="btn" id="btn-chest">СУНДУК</button>
+        <button class="btn" id="btn-dailies">ДЕЙЛИКИ</button>
+        <button class="btn" id="btn-achievements">ДОСТИЖЕНИЯ</button>
         <button class="btn ghost" id="btn-how">КАК ИГРАТЬ</button>
         <button class="btn ghost" id="btn-settings">НАСТРОЙКИ</button>
       </div>

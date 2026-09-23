@@ -166,6 +166,32 @@ h2 {
   background: transparent;
 }
 
+.field {
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  background: rgba(8, 10, 20, 0.92);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 14px;
+  font: 500 16px/1.2 Manrope, sans-serif;
+  margin-top: 10px;
+}
+
+.screen.scroll {
+  justify-content: flex-start;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.error {
+  color: var(--pink);
+  min-height: 1.2em;
+}
+
+.menu-stats .crystal {
+  color: var(--violet);
+}
+
 .btn:active {
   transform: scale(0.98);
 }

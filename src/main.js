@@ -3,10 +3,12 @@ import { Game, WEAPON_INFO } from "./game.js";
 import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
+import { api } from "./api.js";
 
 const $ = (id) => document.getElementById(id);
 const audio = new Synth();
 let meta = loadMeta();
+let profile = null;
 
 const ui = {
   save() {
@@ -78,15 +80,36 @@ const ui = {
 const game = new Game($("game"), ui, audio, meta);
 
 function hideAll() {
-  for (const id of ["screen-menu", "screen-hangar", "screen-how", "screen-settings", "screen-cards", "screen-result"]) {
+  for (const id of ["screen-login", "screen-menu", "screen-hangar", "screen-how", "screen-settings", "screen-cards", "screen-result"]) {
     $(id).classList.add("hidden");
   }
 }
 
+function applyProfile(next) {
+  profile = next;
+  refreshMenu();
+}
+
 function refreshMenu() {
-  $("menu-best").textContent = String(meta.bestWave);
-  $("menu-chapter").textContent = String(meta.bestLevel || 1);
-  $("menu-coins").textContent = String(meta.coins);
+  $("menu-account").textContent = String(profile?.accountLevel || 1);
+  $("menu-coins").textContent = String(profile?.coins || 0);
+  $("menu-crystals").textContent = String(profile?.crystals || 0);
+}
+
+function showLogin(message) {
+  hideAll();
+  $("login-error").textContent = message || "";
+  $("screen-login").classList.remove("hidden");
+}
+
+function showMenu() {
+  hideAll();
+  $("screen-menu").classList.remove("hidden");
+  refreshMenu();
+  if (!meta.seenHow) {
+    hideAll();
+    $("screen-how").classList.remove("hidden");
+  }
 }
 
 function renderHangar() {
@@ -110,10 +133,28 @@ function renderHangar() {
 }
 
 $("btn-play").onclick = () => {
+  if (!api.token()) return;
   audio.unlock();
   game.meta = meta;
+  game.profile = profile;
   game.startRun();
 };
+
+async function enter(mode) {
+  const name = $("login-name").value.trim();
+  const password = $("login-password").value;
+  $("login-error").textContent = "";
+  try {
+    const session = mode === "register" ? await api.register(name, password) : await api.login(name, password);
+    applyProfile(session.profile);
+    showMenu();
+  } catch (error) {
+    $("login-error").textContent = error.message || "Вход не удался";
+  }
+}
+
+$("btn-login").onclick = () => enter("login");
+$("btn-register").onclick = () => enter("register");
 $("btn-hangar").onclick = () => {
   hideAll();
   $("screen-hangar").classList.remove("hidden");
@@ -154,9 +195,11 @@ $("btn-how-back").onclick = () => {
   $("screen-menu").classList.remove("hidden");
 };
 $("btn-again").onclick = () => {
+  if (!api.token()) return;
   audio.unlock();
   hideAll();
   game.meta = meta;
+  game.profile = profile;
   game.startRun();
 };
 $("btn-result-menu").onclick = () => {
@@ -166,9 +209,19 @@ $("btn-result-menu").onclick = () => {
   refreshMenu();
 };
 
-refreshMenu();
-if (!meta.seenHow) {
-  hideAll();
-  $("screen-how").classList.remove("hidden");
+async function boot() {
+  if (!api.token()) {
+    showLogin();
+    return;
+  }
+  try {
+    const me = await api.me();
+    applyProfile(me.profile);
+    showMenu();
+  } catch (error) {
+    showLogin(error.message || "Сессия не найдена");
+  }
 }
+
+boot();
 game.loop(performance.now());
