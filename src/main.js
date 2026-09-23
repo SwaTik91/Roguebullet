@@ -4,6 +4,7 @@ import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
 import { api } from "./api.js";
+import { retryPendingClaims } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
 const audio = new Synth();
@@ -18,6 +19,7 @@ const ui = {
   showPlay() {
     hideAll();
     $("hud").classList.remove("hidden");
+    retryPendingClaims(applyProfile);
   },
   updateHud(run) {
     $("hud-wave").textContent = String(run.wave);
@@ -57,16 +59,25 @@ const ui = {
   hideCards() {
     $("screen-cards").classList.add("hidden");
   },
-  showResult(win, run, gain) {
+  showResult(win, run, granted, extra = {}) {
     $("hud").classList.add("hidden");
     $("screen-result").classList.remove("hidden");
     $("result-title").textContent = win ? "ГЛАВА УДЕРЖАНА" : "ЯДРО ПАЛО";
-    $("result-sub").textContent = win
-      ? "Все 3 уровня пройдены. Сборка сохранила ядро до конца."
-      : `Уровень ${run.level} не удержан. Улучши ангар и вернись.`;
     $("result-wave").textContent = String(run.level);
-    $("result-kills").textContent = String(run.kills);
-    $("result-coins").textContent = `+${gain}`;
+    const kills = run.kills && typeof run.kills === "object"
+      ? Object.values(run.kills).reduce((sum, n) => sum + Number(n || 0), 0)
+      : run.kills;
+    $("result-kills").textContent = String(kills || 0);
+    if (extra.pending || !granted) {
+      $("result-sub").textContent = "Награда будет выдана при появлении связи";
+      $("result-coins").textContent = "…";
+      return;
+    }
+    const crystals = granted.crystals ? ` Кристаллы +${granted.crystals}.` : "";
+    $("result-sub").textContent = (win
+      ? "Все 3 уровня пройдены. Сборка сохранила ядро до конца."
+      : `Уровень ${run.level} не удержан. Улучши ангар и вернись.`) + crystals;
+    $("result-coins").textContent = `+${granted.coins}`;
   },
   toast(text) {
     const el = $("toast");
@@ -87,6 +98,7 @@ function hideAll() {
 
 function applyProfile(next) {
   profile = next;
+  game.profile = next;
   refreshMenu();
 }
 
@@ -106,6 +118,7 @@ function showMenu() {
   hideAll();
   $("screen-menu").classList.remove("hidden");
   refreshMenu();
+  retryPendingClaims(applyProfile);
   if (!meta.seenHow) {
     hideAll();
     $("screen-how").classList.remove("hidden");

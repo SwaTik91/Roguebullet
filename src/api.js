@@ -34,6 +34,12 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     me() {
       return request("/me");
     },
+    claimRun(facts) {
+      return request("/runs", { method: "POST", body: facts });
+    },
+    takeCard(runId) {
+      return request("/cards/take", { method: "POST", body: { runId } });
+    },
   };
 }
 

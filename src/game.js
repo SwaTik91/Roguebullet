@@ -1,4 +1,17 @@
-import { SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount } from "./content.js";
+import { SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount, defaultWep } from "./content.js";
+import { api } from "./api.js";
+
+const PENDING_KEY = "roguebullet-pending-run";
+const CHEST_CARDS = {
+  Калибр: (r) => (r.gun.dmg *= 1.35),
+  Темп: (r) => (r.gun.rate *= 1.25),
+  Сервопривод: (r) => (r.gun.autoTurn *= 1.45),
+  Пластины: (r) => {
+    r.tower.maxHp += 80;
+    r.tower.hp += 80;
+    r.tower.regen += 1.2;
+  },
+};
 
 const LEVELS = 3;
 
@@ -92,14 +105,19 @@ export class Game {
     this.canvas.addEventListener("touchend", up);
   }
 
-  startRun() {
-    const atk = 1 + this.meta.atk * 0.12;
-    const hp = 220 + this.meta.hp * 40;
+  async startRun() {
+    const profile = this.profile || {};
+    const hangar = profile.hangar || { atk: 0, hp: 0, charge: 0 };
+    const atk = 1 + (hangar.atk || 0) * 0.12;
+    const hp = 220 + (hangar.hp || 0) * 40;
     this.run = {
+      runId: crypto.randomUUID(),
       level: 1,
       chapter: 1,
       wave: 1,
-      kills: 0,
+      kills: { circle: 0, triangle: 0, square: 0, hex: 0, diamond: 0, split: 0, boss: 0 },
+      wavesCleared: 0,
+      levelsCleared: 0,
       coins: 0,
       xp: 0,
       nextXp: 18,
@@ -107,7 +125,7 @@ export class Game {
       comboType: null,
       combo: 0,
       comboFlash: 0,
-      overdrive: { charge: 8 * this.meta.charge, max: 100, dur: 3.4, left: 0, mul: 1.85 },
+      overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85 },
       weapons: { gun: true },
       wepStats: {},
       drones: [],
@@ -124,7 +142,7 @@ export class Game {
         focusMul: 1.65,
         cd: 0,
       },
-      crit: { chance: 0.08, mul: 2 },
+      crit: { chance: 0.08 + (profile.critBonus || 0) / 100, mul: 2 },
       tower: { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 },
       enemies: [],
       bullets: [],
@@ -133,10 +151,29 @@ export class Game {
       spawnTimer: 0,
       wavePause: 1.2,
       won: false,
+      usedCard: false,
     };
-    this.queueWave();
+    for (const id of profile.weapons || []) {
+      this.run.weapons[id] = true;
+      this.run.wepStats[id] = defaultWep(id);
+    }
+    if (this.run.weapons.drone) this.syncDrones();
     this.state = "play";
     this.ui.showPlay();
+    let cardName = null;
+    try {
+      const taken = await api.takeCard(this.run.runId);
+      cardName = taken?.card || null;
+      if (taken?.profile) this.ui.applyProfile?.(taken.profile);
+    } catch {
+      cardName = (profile.cardQueue || [])[0] || null;
+    }
+    const applyCard = CHEST_CARDS[cardName];
+    if (applyCard) {
+      applyCard(this.run);
+      this.run.usedCard = true;
+    }
+    this.queueWave();
     this.ui.updateHud(this.run);
   }
 
@@ -193,6 +230,7 @@ export class Game {
       slow: 0,
       phase: Math.random() * Math.PI * 2,
       dead: false,
+      fromSplit: !!fromSplit,
     });
   }
 
@@ -274,7 +312,9 @@ export class Game {
   kill(e) {
     if (e.dead) return;
     e.dead = true;
-    this.run.kills += 1;
+    const bucket = e.fromSplit ? "split" : e.type;
+    if (this.run.kills[bucket] === undefined) this.run.kills.split += 1;
+    else this.run.kills[bucket] += 1;
     this.run.coins += e.coins;
     this.run.xp += e.xp;
     this.run.gun.dmg *= 1 + this.run.gun.killStack;
@@ -325,7 +365,8 @@ export class Game {
 
   offerCards() {
     this.state = "cards";
-    this.ui.showCards(pickCards(this.run));
+    const count = this.profile?.fourthCard ? 4 : 3;
+    this.ui.showCards(pickCards(this.run, count));
   }
 
   applyCard(card) {
@@ -489,6 +530,7 @@ export class Game {
 
   advanceLevel() {
     const r = this.run;
+    r.levelsCleared += 1;
     if (r.level >= LEVELS) {
       this.end(true);
       return;
@@ -510,17 +552,42 @@ export class Game {
     this.queueWave();
   }
 
+  facts() {
+    return {
+      runId: this.run.runId,
+      kills: { ...this.run.kills },
+      wavesCleared: this.run.wavesCleared,
+      levelsCleared: this.run.levelsCleared,
+      endedLevel: this.run.level,
+      endedWave: this.run.wave,
+      won: !!this.run.won,
+    };
+  }
+
   end(win) {
     this.state = "result";
     this.run.won = win;
-    const progress = (this.run.level - 1) * 6 + this.run.wave;
-    const gain = this.run.coins + (win ? 40 : 0) + progress;
-    this.meta.coins += gain;
+    const run = this.run;
+    const progress = (run.level - 1) * 6 + run.wave;
     this.meta.bestWave = Math.max(this.meta.bestWave, progress);
-    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, win ? LEVELS : this.run.level);
+    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, win ? LEVELS : run.level);
     this.ui.save();
-    this.ui.showResult(win, this.run, gain);
+    const facts = this.facts();
+    rememberPending(facts);
+    this.ui.showResult(win, run, null, { pending: true });
+    this.claimFacts(facts, run);
     win ? this.audio.win() : this.audio.lose();
+  }
+
+  async claimFacts(facts, run) {
+    try {
+      const result = await api.claimRun(facts);
+      forgetPending(facts.runId);
+      if (result.profile) this.ui.applyProfile?.(result.profile);
+      if (this.run && this.run.runId === facts.runId) this.ui.showResult(!!facts.won, run, result.granted);
+    } catch {
+      if (this.run && this.run.runId === facts.runId) this.ui.showResult(!!facts.won, run, null, { pending: true });
+    }
   }
 
   update(dt) {
@@ -620,6 +687,7 @@ export class Game {
     } else if (!r.enemies.some((e) => !e.dead)) {
       r.wavePause += dt;
       if (r.wavePause > 1.15) {
+        r.wavesCleared += 1;
         if (r.wave === 6) {
           this.advanceLevel();
           this.draw(dt);
@@ -947,3 +1015,40 @@ function pointLine(px, py, x1, y1, x2, y2) {
 }
 
 export { WEAPON_INFO };
+
+function readPending() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PENDING_KEY) || "null");
+    if (!parsed) return [];
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
+
+function writePending(list) {
+  if (!list.length) localStorage.removeItem(PENDING_KEY);
+  else localStorage.setItem(PENDING_KEY, JSON.stringify(list.length === 1 ? list[0] : list));
+}
+
+function rememberPending(facts) {
+  const list = readPending().filter((item) => item.runId !== facts.runId);
+  list.push(facts);
+  writePending(list);
+}
+
+function forgetPending(runId) {
+  writePending(readPending().filter((item) => item.runId !== runId));
+}
+
+export async function retryPendingClaims(onProfile) {
+  for (const facts of readPending()) {
+    try {
+      const result = await api.claimRun(facts);
+      forgetPending(facts.runId);
+      if (result.profile) onProfile?.(result.profile);
+    } catch {
+      return;
+    }
+  }
+}
