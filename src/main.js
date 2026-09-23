@@ -90,10 +90,42 @@ const ui = {
 
 const game = new Game($("game"), ui, audio, meta);
 
+const SCREENS = [
+  "screen-login",
+  "screen-menu",
+  "screen-hangar",
+  "screen-shop",
+  "screen-chest",
+  "screen-dailies",
+  "screen-achievements",
+  "screen-how",
+  "screen-settings",
+  "screen-cards",
+  "screen-result",
+];
+const SHOP_WEAPONS = ["laser", "scatter", "grenade", "emp", "orb", "drone"];
+const DAILY_TITLES = {
+  wave3: "Пройти 3-ю волну",
+  kills40: "Убить 40 врагов",
+  level: "Пройти 1 уровень",
+};
+const ACHIEVEMENT_TITLES = {
+  first_blood: "Первая кровь",
+  first_boss: "Первый босс",
+  three_levels: "Три уровня",
+  kills_100: "Сотня",
+  kills_500: "Полтысячи",
+  hangar: "Ангар",
+  chest: "Сундук",
+};
+
 function hideAll() {
-  for (const id of ["screen-login", "screen-menu", "screen-hangar", "screen-how", "screen-settings", "screen-cards", "screen-result"]) {
-    $(id).classList.add("hidden");
-  }
+  for (const id of SCREENS) $(id).classList.add("hidden");
+}
+
+function openScreen(id) {
+  hideAll();
+  $(id).classList.remove("hidden");
 }
 
 function applyProfile(next) {
@@ -125,24 +157,122 @@ function showMenu() {
   }
 }
 
+async function purchase(action, rerender) {
+  try {
+    const result = await action();
+    applyProfile(result.profile);
+    rerender?.();
+    return result;
+  } catch (error) {
+    ui.toast(error.message || "Не вышло");
+    return null;
+  }
+}
+
 function renderHangar() {
-  $("hangar-coins").textContent = String(meta.coins);
+  const coins = profile?.coins || 0;
+  $("hangar-coins").textContent = String(coins);
   $("hangar-list").innerHTML = META_UPGRADES.map((u) => {
-    const lvl = meta[u.key];
+    const lvl = profile?.hangar?.[u.key] || 0;
     const cost = upgradeCost(lvl);
-    return `<div class="upgrade"><div><strong>${u.title}</strong><div class="sub">ур. ${lvl} · ${u.desc}</div></div><button data-key="${u.key}" ${meta.coins < cost ? "disabled" : ""}>${cost}</button></div>`;
+    return `<div class="upgrade"><div><strong>${u.title}</strong><div class="sub">ур. ${lvl} · ${u.desc}</div></div><button data-key="${u.key}" ${coins < cost ? "disabled" : ""}>${cost}</button></div>`;
   }).join("");
   $("hangar-list").querySelectorAll("button").forEach((btn) => {
-    btn.onclick = () => {
-      const key = btn.dataset.key;
-      const cost = upgradeCost(meta[key]);
-      if (meta.coins < cost) return;
-      meta.coins -= cost;
-      meta[key] += 1;
-      ui.save();
-      renderHangar();
-    };
+    btn.onclick = () => purchase(() => api.buyHangar(btn.dataset.key), renderHangar);
   });
+}
+
+function renderShop() {
+  const crystals = profile?.crystals || 0;
+  const owned = new Set(profile?.weapons || []);
+  $("shop-crystals").textContent = String(crystals);
+  const rows = [
+    {
+      title: "Шанс крита",
+      desc: `+2% навсегда · ${Math.min(5, Math.floor((profile?.critBonus || 0) / 2))}/5`,
+      label: (profile?.critBonus || 0) >= 10 ? "МАКС" : "25",
+      disabled: crystals < 25 || (profile?.critBonus || 0) >= 10,
+      run: () => api.buyShop("crit"),
+    },
+    ...SHOP_WEAPONS.map((id) => ({
+      title: WEAPON_INFO[id].name,
+      desc: "Есть с начала каждого забега",
+      label: owned.has(id) ? "ЕСТЬ" : "40",
+      disabled: owned.has(id) || crystals < 40,
+      run: () => api.buyShop("weapon", id),
+    })),
+    {
+      title: "Четвёртая карта",
+      desc: "В выборе усиления 4 карты вместо 3",
+      label: profile?.fourthCard ? "ЕСТЬ" : "50",
+      disabled: !!profile?.fourthCard || crystals < 50,
+      run: () => api.buyShop("fourth_card"),
+    },
+  ];
+  $("shop-list").innerHTML = rows
+    .map(
+      (row, index) =>
+        `<div class="upgrade"><div><strong>${row.title}</strong><div class="sub">${row.desc}</div></div><button data-index="${index}" ${row.disabled ? "disabled" : ""}>${row.label}</button></div>`,
+    )
+    .join("");
+  $("shop-list").querySelectorAll("button").forEach((btn) => {
+    btn.onclick = () => purchase(rows[Number(btn.dataset.index)].run, renderShop);
+  });
+}
+
+function renderDailies() {
+  const tasks = profile?.dailies || [];
+  $("daily-list").innerHTML = tasks
+    .map((task) => {
+      const title = DAILY_TITLES[task.id] || task.id;
+      const label = task.claimed ? "ЗАБРАНО" : "ЗАБРАТЬ";
+      const disabled = !task.done || task.claimed;
+      return `<div class="upgrade"><div><strong>${title}</strong><div class="sub">${crystalsLabel(task.crystals)}</div></div><button data-id="${task.id}" ${disabled ? "disabled" : ""}>${label}</button></div>`;
+    })
+    .join("");
+  $("daily-list").querySelectorAll("button").forEach((btn) => {
+    btn.onclick = () => purchase(() => api.claimDaily(btn.dataset.id), renderDailies);
+  });
+}
+
+function renderAchievements() {
+  const items = profile?.achievements || [];
+  $("achievement-list").innerHTML = items
+    .map((item) => {
+      const title = ACHIEVEMENT_TITLES[item.id] || item.id;
+      const label = item.claimed ? "ЗАБРАНО" : "ЗАБРАТЬ";
+      const disabled = !item.ready || item.claimed;
+      return `<div class="upgrade"><div><strong>${title}</strong><div class="sub">${crystalsLabel(item.crystals)}</div></div><button data-id="${item.id}" ${disabled ? "disabled" : ""}>${label}</button></div>`;
+    })
+    .join("");
+  $("achievement-list").querySelectorAll("button").forEach((btn) => {
+    btn.onclick = () => purchase(() => api.claimAchievement(btn.dataset.id), renderAchievements);
+  });
+}
+
+function crystalsLabel(amount) {
+  const n = Math.abs(Number(amount) || 0);
+  const n10 = n % 10;
+  const n100 = n % 100;
+  let word = "кристаллов";
+  if (n10 === 1 && n100 !== 11) word = "кристалл";
+  else if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) word = "кристалла";
+  return `${amount} ${word}`;
+}
+
+function dropText(drop) {
+  if (!drop) return "";
+  if (drop.kind === "coins") return `${drop.amount} монет`;
+      if (drop.kind === "crystals") return crystalsLabel(drop.amount);
+  if (drop.kind === "crit") return `+${drop.amount}% крита`;
+  if (drop.kind === "card") return `Карта: ${drop.card}`;
+  return "";
+}
+
+function renderChest() {
+  const poor = (profile?.crystals || 0) < 20;
+  $("btn-chest-open").disabled = poor;
+  $("btn-chest-open").textContent = poor ? "НУЖНО 20" : "ОТКРЫТЬ";
 }
 
 $("btn-play").onclick = () => {
@@ -169,14 +299,37 @@ async function enter(mode) {
 $("btn-login").onclick = () => enter("login");
 $("btn-register").onclick = () => enter("register");
 $("btn-hangar").onclick = () => {
-  hideAll();
-  $("screen-hangar").classList.remove("hidden");
+  openScreen("screen-hangar");
   renderHangar();
 };
-$("btn-hangar-back").onclick = () => {
-  hideAll();
-  $("screen-menu").classList.remove("hidden");
+$("btn-hangar-back").onclick = () => showMenu();
+$("btn-shop").onclick = () => {
+  openScreen("screen-shop");
+  renderShop();
 };
+$("btn-shop-back").onclick = () => showMenu();
+$("btn-chest").onclick = () => {
+  openScreen("screen-chest");
+  $("chest-result").textContent = "";
+  renderChest();
+};
+$("btn-chest-open").onclick = async () => {
+  $("btn-chest-open").disabled = true;
+  const result = await purchase(() => api.openChest(crypto.randomUUID()), renderChest);
+  if (result?.drop) $("chest-result").textContent = dropText(result.drop);
+  renderChest();
+};
+$("btn-chest-back").onclick = () => showMenu();
+$("btn-dailies").onclick = () => {
+  openScreen("screen-dailies");
+  renderDailies();
+};
+$("btn-dailies-back").onclick = () => showMenu();
+$("btn-achievements").onclick = () => {
+  openScreen("screen-achievements");
+  renderAchievements();
+};
+$("btn-achievements-back").onclick = () => showMenu();
 $("btn-how").onclick = () => {
   hideAll();
   $("screen-how").classList.remove("hidden");
@@ -216,10 +369,8 @@ $("btn-again").onclick = () => {
   game.startRun();
 };
 $("btn-result-menu").onclick = () => {
-  hideAll();
   $("hud").classList.add("hidden");
-  $("screen-menu").classList.remove("hidden");
-  refreshMenu();
+  showMenu();
 };
 
 async function boot() {

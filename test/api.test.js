@@ -62,3 +62,22 @@ test("claim posts run facts without coin totals", async () => {
   assert.equal("coins" in body, false);
   assert.equal(calls[0].options.headers.Authorization, "Bearer abc");
 });
+
+test("buyShop posts the weapon to /shop", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: {
+      getItem: () => "abc",
+      setItem: () => {},
+    },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ profile: { crystals: 0 } }) };
+    },
+  });
+  await api.buyShop("weapon", "laser");
+  assert.equal(calls[0].url, "http://api.test/shop");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { kind: "weapon", weapon: "laser" });
+  assert.equal(calls[0].options.headers.Authorization, "Bearer abc");
+});

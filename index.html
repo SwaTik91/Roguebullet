@@ -84,12 +84,42 @@
         <button class="btn ghost" id="btn-settings">НАСТРОЙКИ</button>
       </div>
 
-      <div id="screen-hangar" class="screen hidden">
+      <div id="screen-hangar" class="screen hidden scroll">
         <h2>АНГАР</h2>
         <p class="sub">Постоянные усилители между вылетами.</p>
         <div class="coins-line">Доступно: <b id="hangar-coins">0</b></div>
         <div class="upgrade-list" id="hangar-list"></div>
         <button class="btn" id="btn-hangar-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-shop" class="screen hidden scroll">
+        <h2>КРИСТАЛЛЫ</h2>
+        <p class="sub">Редкие покупки. Монеты здесь не принимают.</p>
+        <div class="coins-line">Кристаллы: <b id="shop-crystals">0</b></div>
+        <div class="upgrade-list" id="shop-list"></div>
+        <button class="btn" id="btn-shop-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-chest" class="screen hidden">
+        <h2>СУНДУК</h2>
+        <p class="sub">20 кристаллов. Награду выбирает сервер.</p>
+        <p id="chest-result" class="sub"></p>
+        <button class="btn primary" id="btn-chest-open">ОТКРЫТЬ</button>
+        <button class="btn" id="btn-chest-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-dailies" class="screen hidden scroll">
+        <h2>ДЕЙЛИКИ</h2>
+        <p class="sub">Сброс в 00:00 по Москве. Незабранное сгорает.</p>
+        <div class="upgrade-list" id="daily-list"></div>
+        <button class="btn" id="btn-dailies-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-achievements" class="screen hidden scroll">
+        <h2>ДОСТИЖЕНИЯ</h2>
+        <p class="sub">Один раз на аккаунт. Награда только кристаллами.</p>
+        <div class="upgrade-list" id="achievement-list"></div>
+        <button class="btn" id="btn-achievements-back">НАЗАД</button>
       </div>
 
       <div id="screen-how" class="screen hidden">

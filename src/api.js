@@ -40,6 +40,23 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     takeCard(runId) {
       return request("/cards/take", { method: "POST", body: { runId } });
     },
+    buyHangar(key) {
+      return request("/hangar", { method: "POST", body: { key } });
+    },
+    buyShop(kind, weapon) {
+      const body = { kind };
+      if (weapon) body.weapon = weapon;
+      return request("/shop", { method: "POST", body });
+    },
+    openChest(requestId) {
+      return request("/chest", { method: "POST", body: { requestId } });
+    },
+    claimAchievement(id) {
+      return request(`/achievements/${encodeURIComponent(id)}/claim`, { method: "POST", body: {} });
+    },
+    claimDaily(id) {
+      return request(`/dailies/${encodeURIComponent(id)}/claim`, { method: "POST", body: {} });
+    },
   };
 }
 
