@@ -71,20 +71,22 @@ const ui = {
     if (extra.pending || !granted) {
       $("result-sub").textContent = "Награда будет выдана при появлении связи";
       $("result-coins").textContent = "…";
+      $("result-crystals").textContent = "…";
       return;
     }
-    const crystals = granted.crystals ? ` Кристаллы +${granted.crystals}.` : "";
-    $("result-sub").textContent = (win
-      ? "Все 3 уровня пройдены. Сборка сохранила ядро до конца."
-      : `Уровень ${run.level} не удержан. Улучши ангар и вернись.`) + crystals;
-    $("result-coins").textContent = `+${granted.coins}`;
+    $("result-sub").textContent = win
+      ? "Все 3 уровня пройдены. Награда уже на аккаунте."
+      : `Уровень ${run.level} не удержан. Награда уже на аккаунте.`;
+    $("result-coins").textContent = `+${granted.coins || 0}`;
+    $("result-crystals").textContent = `+${granted.crystals || 0}`;
+    ui.toast(`+${granted.coins || 0} монет, +${granted.crystals || 0} кристаллов`, 2600);
   },
-  toast(text) {
+  toast(text, ms = 1400) {
     const el = $("toast");
     el.textContent = text;
     el.classList.remove("hidden");
     clearTimeout(ui._t);
-    ui._t = setTimeout(() => el.classList.add("hidden"), 1400);
+    ui._t = setTimeout(() => el.classList.add("hidden"), ms);
   },
 };
 
@@ -133,6 +135,8 @@ function applyProfile(next) {
   game.profile = next;
   refreshMenu();
 }
+
+ui.applyProfile = applyProfile;
 
 function refreshMenu() {
   $("menu-account").textContent = String(profile?.accountLevel || 1);

@@ -112,10 +112,17 @@ h2 {
 .menu-stats,
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   width: min(420px, 100%);
   margin: 8px 0 22px;
+}
+
+.menu-stats {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.result-grid {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .menu-stats div,
