@@ -255,3 +255,60 @@ test("startRun applies equipped part bonuses to the run", async () => {
   assert.equal(game.run.gun.dmg, 17 * 1.16);
   assert.equal(game.run.tower.maxHp, 220);
 });
+
+function headlessGame(rollPart) {
+  const ui = {
+    showPlay() {},
+    updateHud() {},
+    setCombo() {},
+    toast() {},
+    hideCards() {},
+    showCards() {},
+    save() {},
+    hideLevelClear() {},
+    showLevelClear() {},
+    setLevelClearPart() {},
+    applyProfile() {},
+  };
+  const audio = new Proxy({}, { get: () => () => {} });
+  return new Game(null, ui, audio, { bestWave: 0 }, { headless: true, rollPart });
+}
+
+test("showLevelClear requests a level part roll", async () => {
+  const rollCalls = [];
+  const game = headlessGame(async (body) => {
+    rollCalls.push(body);
+    return { part: { baseName: "Ствол", rarity: "rare" }, profile: {} };
+  });
+  game.profile = { clearedLevels: [] };
+  await game.startRun(1);
+  game.showLevelClear();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(rollCalls.length, 1);
+  assert.deepEqual(rollCalls[0], { runId: game.run.runId, kind: "level", level: 1 });
+});
+
+test("endless part roll only every fifth endless wave cleared", async () => {
+  const rollCalls = [];
+  const game = headlessGame(async (body) => {
+    rollCalls.push(body);
+    return { part: { baseName: "Ствол", rarity: "rare" }, profile: {} };
+  });
+  game.profile = {};
+  await game.startRun(1);
+  game.beginEndless();
+  for (let i = 1; i <= 4; i++) {
+    game.endlessWaveCleared();
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  assert.equal(rollCalls.length, 0);
+  game.endlessWaveCleared();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(rollCalls.length, 1);
+  assert.deepEqual(rollCalls[0], {
+    runId: game.run.runId,
+    kind: "endless",
+    level: game.run.level,
+    wave: 5,
+  });
+});

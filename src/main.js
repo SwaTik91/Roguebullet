@@ -99,7 +99,19 @@ const ui = {
     $("clear-note").textContent = info.crystals
       ? "Кристаллы за первое прохождение придут вместе с наградой забега."
       : "Этот уровень уже был пройден. Кристаллы за него больше не выдаются.";
+    $("clear-part").textContent = "";
+    $("clear-part").classList.add("hidden");
     $("btn-next-level").classList.toggle("hidden", !info.canNext);
+  },
+  setLevelClearPart(line) {
+    const el = $("clear-part");
+    if (!line) {
+      el.textContent = "";
+      el.classList.add("hidden");
+      return;
+    }
+    el.textContent = line;
+    el.classList.remove("hidden");
   },
   hideLevelClear() {
     $("screen-level-clear").classList.add("hidden");

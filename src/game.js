@@ -12,6 +12,13 @@ if (gatling) gatling.src = "/gatling.png";
 
 const LEVELS = 3;
 
+const PART_DROP_RARITY = {
+  common: "обычная",
+  rare: "редкая",
+  epic: "эпическая",
+  legendary: "легендарная",
+};
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -45,6 +52,7 @@ export class Game {
     this.speed = 1;
     this.state = "boot";
     this.queuedCard = options.queuedCard || null;
+    this.rollPart = options.rollPart ?? ((body) => api?.rollPart?.(body));
     this.coop = null;
     this.coopLock = false;
     this.coopWorld = null;
@@ -1106,6 +1114,47 @@ export class Game {
     this.run.fx.push({ kind: "ring", x, y, r: 8, max: 48, life: 0.25, color });
   }
 
+  partDropLine(part) {
+    if (!part) return "";
+    const rarity = PART_DROP_RARITY[part.rarity] || part.rarity || "";
+    return `${part.baseName || part.base} · ${rarity}`;
+  }
+
+  async requestLevelPartRoll() {
+    const r = this.run;
+    if (!r?.runId) return;
+    try {
+      const result = await this.rollPart({ runId: r.runId, kind: "level", level: r.level });
+      if (result?.profile) this.ui.applyProfile?.(result.profile);
+      if (result?.part) this.ui.setLevelClearPart?.(this.partDropLine(result.part));
+    } catch {
+      // Level-clear screen stays usable without a part line.
+    }
+  }
+
+  async requestEndlessPartRoll(endlessWave) {
+    const r = this.run;
+    if (!r?.runId || endlessWave % 5 !== 0) return;
+    try {
+      const result = await this.rollPart({
+        runId: r.runId,
+        kind: "endless",
+        level: r.level,
+        wave: endlessWave,
+      });
+      if (result?.profile) this.ui.applyProfile?.(result.profile);
+      if (result?.part) this.ui.toast?.(this.partDropLine(result.part));
+    } catch {
+      // Endless play continues if the roll fails.
+    }
+  }
+
+  endlessWaveCleared() {
+    const r = this.run;
+    r.endlessWaves = (r.endlessWaves || 0) + 1;
+    void this.requestEndlessPartRoll(r.endlessWaves);
+  }
+
   showLevelClear() {
     const r = this.run;
     r.levelsCleared += 1;
@@ -1121,6 +1170,7 @@ export class Game {
       crystals,
       canNext: r.level < LEVELS,
     });
+    void this.requestLevelPartRoll();
   }
 
   continueLevel() {
@@ -1166,6 +1216,7 @@ export class Game {
     }
     const r = this.run;
     r.endless = true;
+    r.endlessWaves = 0;
     r.power = 2;
     r.wave = 7;
     r.tower.hp = r.tower.maxHp;
@@ -1444,6 +1495,7 @@ export class Game {
         r.wavesCleared += 1;
         if (r.endless) {
           this.ui.onEndlessWave?.(r.level, r.wave);
+          this.endlessWaveCleared();
           r.power *= 2;
           r.wave += 1;
           if (r.wave > 40) {
