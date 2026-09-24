@@ -93,3 +93,61 @@ test("buyShop posts the weapon to /shop", async () => {
   assert.deepEqual(JSON.parse(calls[0].options.body), { kind: "weapon", weapon: "laser" });
   assert.equal(calls[0].options.headers.Authorization, "Bearer abc");
 });
+
+test("equipPart posts partId to /parts/equip", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: {
+      getItem: () => "abc",
+      setItem: () => {},
+    },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ profile: {} }) };
+    },
+  });
+  await api.equipPart("p1");
+  assert.equal(calls[0].url, "http://api.test/parts/equip");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { partId: "p1" });
+  assert.equal(calls[0].options.method, "POST");
+});
+
+test("unequipPart posts slot to /parts/unequip", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: {
+      getItem: () => "abc",
+      setItem: () => {},
+    },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ profile: {} }) };
+    },
+  });
+  await api.unequipPart(3);
+  assert.equal(calls[0].url, "http://api.test/parts/unequip");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { slot: 3 });
+  assert.equal(calls[0].options.method, "POST");
+});
+
+test("rollPart posts the body to /parts/roll", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: {
+      getItem: () => "abc",
+      setItem: () => {},
+    },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ part: null, profile: {} }) };
+    },
+  });
+  const body = { runId: "r", kind: "level", level: 1 };
+  await api.rollPart(body);
+  assert.equal(calls[0].url, "http://api.test/parts/roll");
+  assert.deepEqual(JSON.parse(calls[0].options.body), body);
+  assert.equal(calls[0].options.method, "POST");
+});

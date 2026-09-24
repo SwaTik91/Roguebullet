@@ -488,6 +488,54 @@ h2 {
   color: var(--amber);
 }
 
+.parts-grid {
+  width: min(420px, 100%);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.part-slot {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 10px;
+  min-height: 88px;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+}
+
+.part-slot.empty {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.part-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.rarity-common {
+  color: var(--text);
+}
+
+.rarity-rare {
+  color: var(--cyan);
+}
+
+.rarity-epic {
+  color: var(--violet);
+}
+
+.rarity-legendary {
+  color: var(--amber);
+}
+
 .toast {
   position: absolute;
   top: calc(168px + env(safe-area-inset-top));

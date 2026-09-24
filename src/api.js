@@ -80,6 +80,15 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     buyReroll(runId, offerLevel) {
       return request("/reroll", { method: "POST", body: { runId, offerLevel } });
     },
+    equipPart(partId) {
+      return request("/parts/equip", { method: "POST", body: { partId } });
+    },
+    unequipPart(slot) {
+      return request("/parts/unequip", { method: "POST", body: { slot } });
+    },
+    rollPart(body) {
+      return request("/parts/roll", { method: "POST", body });
+    },
     battleStart(body) {
       return request("/battle/start", { method: "POST", body });
     },

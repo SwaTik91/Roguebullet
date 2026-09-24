@@ -4,6 +4,7 @@ import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
 import { api, newId } from "./api.js";
+import { describeAffix } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
 import { retryPendingClaims } from "./game.js";
@@ -155,6 +156,7 @@ const SCREENS = [
   "screen-levels",
   "screen-coop",
   "screen-hangar",
+  "screen-parts",
   "screen-shop",
   "screen-chest",
   "screen-dailies",
@@ -179,6 +181,12 @@ const ACHIEVEMENT_TITLES = {
   kills_500: "Полтысячи",
   hangar: "Ангар",
   chest: "Сундук",
+};
+const PART_RARITY_LABELS = {
+  legendary: "ЛЕГЕНДАРКА",
+  epic: "ЭПИК",
+  rare: "РЕДКАЯ",
+  common: "ОБЫЧНАЯ",
 };
 
 function hideAll() {
@@ -243,6 +251,50 @@ function renderHangar() {
   }).join("");
   $("hangar-list").querySelectorAll("button").forEach((btn) => {
     btn.onclick = () => purchase(() => api.buyHangar(btn.dataset.key), renderHangar);
+  });
+}
+
+function partBlock(part) {
+  const affixLines = (part.affixes || [])
+    .map((affix) => describeAffix(part.family, affix))
+    .map((line) => `<div class="sub">${line}</div>`)
+    .join("");
+  const rarity = part.rarity || "common";
+  return `<strong>${part.baseName || part.base}</strong><div class="sub rarity-${rarity}">${PART_RARITY_LABELS[rarity] || rarity}</div>${affixLines}`;
+}
+
+function renderParts() {
+  const parts = profile?.parts || [];
+  const loadout = profile?.loadout?.length === 8 ? profile.loadout : Array(8).fill(null);
+  const byId = new Map(parts.map((p) => [p.id, p]));
+  const equipped = new Set(loadout.filter(Boolean));
+
+  $("parts-slots").innerHTML = loadout
+    .map((id, index) => {
+      const part = id ? byId.get(id) : null;
+      const filled = Boolean(part);
+      return `<button type="button" class="part-slot${filled ? "" : " empty"}" data-slot="${index}" ${filled ? "" : "disabled"}>${filled ? partBlock(part) : '<span class="sub">Пусто</span>'}</button>`;
+    })
+    .join("");
+
+  $("parts-slots").querySelectorAll("button[data-slot]:not([disabled])").forEach((btn) => {
+    btn.onclick = () =>
+      purchase(() => api.unequipPart(Number(btn.dataset.slot)), renderParts);
+  });
+
+  const stash = parts.filter((p) => !equipped.has(p.id));
+  if (!stash.length) {
+    $("parts-list").innerHTML = '<p class="sub">Склад пуст.</p>';
+    return;
+  }
+  $("parts-list").innerHTML = stash
+    .map(
+      (part) =>
+        `<button type="button" class="upgrade part-row" data-part-id="${part.id}"><div>${partBlock(part)}</div></button>`,
+    )
+    .join("");
+  $("parts-list").querySelectorAll("button[data-part-id]").forEach((btn) => {
+    btn.onclick = () => purchase(() => api.equipPart(btn.dataset.partId), renderParts);
   });
 }
 
@@ -455,6 +507,11 @@ $("btn-hangar").onclick = () => {
   renderHangar();
 };
 $("btn-hangar-back").onclick = () => showMenu();
+$("btn-parts").onclick = () => {
+  openScreen("screen-parts");
+  renderParts();
+};
+$("btn-parts-back").onclick = () => showMenu();
 $("btn-shop").onclick = () => {
   openScreen("screen-shop");
   renderShop();
