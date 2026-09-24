@@ -4,7 +4,7 @@ import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
 import { api, newId } from "./api.js";
-import { describeAffix } from "./parts.js";
+import { describeAffix, partFamilyLabel } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
 import { retryPendingClaims, retryPendingPartRolls } from "./game.js";
@@ -283,7 +283,7 @@ function partBlock(part) {
     })
     .join("");
   const rarity = part.rarity || "common";
-  return `<strong>${part.baseName || part.base}</strong><div class="sub rarity-${rarity}">${PART_RARITY_LABELS[rarity] || rarity}</div>${affixLines}`;
+  return `<strong>${part.baseName || part.base}</strong><div class="sub rarity-${rarity}">${partFamilyLabel(part.family)} · ${PART_RARITY_LABELS[rarity] || rarity}</div>${affixLines}`;
 }
 
 function renderParts() {

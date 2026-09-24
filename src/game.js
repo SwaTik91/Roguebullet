@@ -4,7 +4,7 @@ import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } fr
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
 import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
-import { sumBonuses, applyBonuses } from "./parts.js";
+import { sumBonuses, applyBonuses, partFamilyLabel } from "./parts.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const PENDING_PART_ROLL_KEY = "roguebullet-pending-part-roll";
@@ -1119,7 +1119,7 @@ export class Game {
   partDropLine(part) {
     if (!part) return "";
     const rarity = PART_DROP_RARITY[part.rarity] || part.rarity || "";
-    return `${part.baseName || part.base} · ${rarity}`;
+    return `${part.baseName || part.base} · ${partFamilyLabel(part.family)} · ${rarity}`;
   }
 
   partRollBody(kind, levelOrWave) {

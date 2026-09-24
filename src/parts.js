@@ -263,10 +263,33 @@ export function formatAffixNumber(value) {
   return text;
 }
 
+export function partFamilyLabel(family) {
+  return {
+    gun: "Пулемёт",
+    drone: "Дрон",
+    laser: "Лазер",
+    scatter: "Дробь",
+    grenade: "Граната",
+    emp: "EMP",
+    orb: "Сферы",
+  }[family] || "Общая";
+}
+
+const FAMILY_OF = {
+  gun: "пулемёта",
+  drone: "дрона",
+  laser: "лазера",
+  scatter: "дроби",
+  grenade: "гранаты",
+  emp: "EMP",
+  orb: "сфер",
+};
+
 export function describeAffix(family, affix) {
   const table = family ? AFFIX_META[family] : AFFIX_META.common;
   const meta = table?.[affix.id];
-  const name = affix.name || meta?.name || affix.id;
+  const baseName = affix.name || meta?.name || affix.id;
+  const name = family && FAMILY_OF[family] ? `${baseName} ${FAMILY_OF[family]}` : baseName;
   const step = affix.step ?? 1;
   const rarity = RARITY_ORDER[step - 1] || "common";
 
