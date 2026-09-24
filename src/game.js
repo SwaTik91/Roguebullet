@@ -181,6 +181,7 @@ export class Game {
       bullets: [],
       fx: [],
       beams: [],
+      pools: [],
       spawnQueue: [],
       spawnTimer: 0,
       wavePause: 1.2,
@@ -615,29 +616,192 @@ export class Game {
 
   fireScatter() {
     const s = this.run.wepStats.scatter;
-    const t = this.nearest(this.run.tower);
-    if (!t) return;
+    const first = this.nearest(this.run.tower);
+    if (!first) return;
+    const targets = [first];
+    if (s.fork) {
+      const second = this.nearest(this.run.tower, (e) => e !== first);
+      if (second) targets.push(second);
+    }
+    for (const t of targets) this.scatterVolley(s, t);
+    if (s.volley) {
+      s.pending = 1;
+      s.pendingIn = 0.14;
+    }
+  }
+
+  scatterVolley(s, t) {
     const base = angTo(this.run.tower, t);
+    const gap = s.gap || 0.09;
+    const mid = (s.n - 1) / 2;
     for (let i = 0; i < s.n; i++) {
-      const a = base + (i - (s.n - 1) / 2) * 0.09;
+      const center = Math.abs(i - mid) < 0.6;
+      const a = base + (i - mid) * gap;
+      let dmg = s.dmg;
+      if (s.center && center) dmg = s.dmg * s.n * (s.centerMul || 1);
+      else if (s.rim) dmg *= 2;
       this.run.bullets.push({
         x: this.run.tower.x,
         y: this.run.tower.y,
         vx: Math.cos(a) * 620,
         vy: Math.sin(a) * 620,
-        dmg: s.dmg,
-        r: 3,
-        pierce: 0,
+        dmg,
+        r: center && s.center ? 6 : 3,
+        pierce: center && s.steady ? 12 : s.pierce || 0,
+        falloff: center && s.steady ? 1 : 0,
         knock: s.knock,
-        life: 0.38,
+        life: !center && s.far ? 0.76 : 0.38,
         color: "#fbbf24",
         kind: "pellet",
+        bog: !!s.bog,
+        cordon: !!s.cordon,
+        cluster: !!s.cluster,
+        shards: s.shards || 0,
+        shardMul: s.shardMul || 0.45,
+        shardLife: s.shardLife || 0.16,
+        echo: !!s.echo,
+        avalanche: !!s.avalanche,
+        shardPierce: s.shardPierce || 0,
         hit: new Set(),
       });
     }
   }
 
-  fireGrenade() {
+  updateOrbs(dt, tw) {
+    const o = this.run.wepStats.orb;
+    const r = this.run;
+    r.orbAngle += o.spin * dt;
+    if (o.branch === "ward") {
+      o.guardT = (o.guardT ?? o.guardCd ?? 4) - dt;
+      if ((o.guard || 0) < (o.guardMax || 1) && o.guardT <= 0) {
+        o.guard = (o.guard || 0) + 1;
+        o.guardT = o.guardCd || 4;
+      }
+    }
+    if (o.lunge) {
+      o.lungeT = (o.lungeT || 0) - dt;
+      if (o.lungeT <= 0) {
+        o.lungeT = o.lungeCd || 1.3;
+        const pack = o.salvo ? this.densest() : null;
+        o.fly = [];
+        for (let i = 0; i < o.count; i++) {
+          const home = this.orbHome(o, i, tw);
+          const target = pack || this.nearest(home);
+          if (!target) continue;
+          o.fly.push({ i, x: home.x, y: home.y, tx: target.x, ty: target.y, hit: false, back: false, anchor: null, hook: !!o.hook });
+        }
+      }
+    }
+    const spots = [];
+    for (let i = 0; i < o.count; i++) {
+      const home = this.orbHome(o, i, tw);
+      const fly = (o.fly || []).find((f) => f.i === i && !f.done);
+      let x = home.x;
+      let y = home.y;
+      if (fly) {
+        const dest = fly.back ? home : { x: fly.tx, y: fly.ty };
+        const a = angTo(fly, dest);
+        fly.x += Math.cos(a) * 720 * dt;
+        fly.y += Math.sin(a) * 720 * dt;
+        x = fly.x;
+        y = fly.y;
+        if (o.through && !fly.back) {
+          for (const e of r.enemies) {
+            if (!e.dead && dist(e, fly) < e.r + 14) this.damage(e, o.dmg * dt * 10, "#34d399", false);
+          }
+        }
+        if (!fly.hit && dist(fly, { x: fly.tx, y: fly.ty }) < 18) {
+          fly.hit = true;
+          const victim = this.nearest(fly);
+          if (victim) {
+            this.damage(victim, o.dmg * (o.lungeMul || 8), "#34d399");
+            if (o.anchor && !victim.dead) fly.anchor = victim;
+          }
+          if (fly.hook) {
+            const next = this.nearest(fly, (e) => e !== victim);
+            if (next) {
+              fly.tx = next.x;
+              fly.ty = next.y;
+              fly.hit = false;
+              fly.hook = false;
+            } else fly.back = true;
+          } else if (!fly.anchor) fly.back = true;
+        }
+        if (fly.anchor && !fly.anchor.dead) {
+          fly.x = fly.anchor.x;
+          fly.y = fly.anchor.y;
+          x = fly.x;
+          y = fly.y;
+          this.damage(fly.anchor, o.dmg * dt * 8, "#34d399", false);
+        } else if (fly.anchor) fly.back = true;
+        if (fly.back && dist(fly, home) < 16) fly.done = true;
+      }
+      spots.push({ x, y, home });
+      const reach = 12 * (o.reach || 1);
+      for (const e of r.enemies) {
+        if (e.dead) continue;
+        const touch = dist(e, { x, y }) < e.r + reach;
+        const onRing = o.saw && Math.abs(dist(e, tw) - o.radius) < 16 + e.r;
+        if (touch || onRing) {
+          this.damage(e, o.dmg * dt * (o.saw && onRing ? 6 : 8), "#34d399", false);
+          if (o.bleed) this.ignite(e, o.dmg * 4);
+          if (o.knock && o.branch === "ward") {
+            const a = angTo(tw, e);
+            e.x += Math.cos(a) * o.knock * dt;
+            e.y += Math.sin(a) * o.knock * dt;
+          }
+          if (o.pin && o.guard > 0 && touch) {
+            e.slow = Math.max(e.slow || 0, 0.2);
+            e.slowMul = 0.08;
+          }
+        }
+        if (o.wall && o.guard > 0 && dist(e, tw) < o.radius && dist(e, home) < 28) {
+          const a = angTo(tw, e);
+          e.x = tw.x + Math.cos(a) * (o.radius + e.r);
+          e.y = tw.y + Math.sin(a) * (o.radius + e.r);
+        }
+      }
+      if (o.inner) {
+        const inner = { x: tw.x + (home.x - tw.x) * 0.45, y: tw.y + (home.y - tw.y) * 0.45 };
+        for (const e of r.enemies) {
+          if (!e.dead && dist(e, inner) < e.r + reach) this.damage(e, o.dmg * dt * 8, "#34d399", false);
+        }
+      }
+    }
+    o.spots = spots;
+  }
+
+  orbHome(o, i, tw) {
+    const a = this.run.orbAngle + (i * Math.PI * 2) / Math.max(1, o.count);
+    return { x: tw.x + Math.cos(a) * o.radius, y: tw.y + Math.sin(a) * o.radius };
+  }
+
+  burstPellets(x, y, n, dmg, life, pierce, again) {
+    for (let i = 0; i < n; i++) {
+      const a = (Math.PI * 2 * i) / n;
+      this.run.bullets.push({
+        x,
+        y,
+        vx: Math.cos(a) * 460,
+        vy: Math.sin(a) * 460,
+        dmg,
+        r: 3,
+        pierce,
+        life,
+        color: "#fde68a",
+        kind: "pellet",
+        cluster: again,
+        shards: again ? 3 : 0,
+        shardMul: 0.45,
+        shardLife: 0.12,
+        echo: false,
+        avalanche: false,
+        hit: new Set(),
+      });
+    }
+  }
+
+  fireGrenade(quiet = false) {
     const s = this.run.wepStats.grenade;
     const t = this.densest() || this.nearest(this.run.tower);
     if (!t) return;
@@ -652,6 +816,22 @@ export class Game {
       color: "#fb7185",
       kind: "nade",
       radius: s.radius,
+      shape: s.shape || "",
+      reach: s.reach || 1,
+      width: s.width || 0.7,
+      bombs: s.bombs || 0,
+      bombMul: s.bombMul || 0.55,
+      bombSpread: s.bombSpread || 1,
+      core: !!s.core,
+      twin: !!s.twin && !quiet,
+      pool: s.pool || 0,
+      poolDmg: s.poolDmg || s.dmg * 0.35,
+      poolAll: !!s.poolAll,
+      resin: !!s.resin,
+      pull: !!s.pull,
+      pit: s.pit || 0,
+      magma: !!s.magma,
+      twice: !!s.twice,
       hit: new Set(),
     });
   }
@@ -737,6 +917,57 @@ export class Game {
       pool.push(next);
       this.damage(next, s.dmg * 0.8, "#c084fc");
       this.run.fx.push({ kind: "beam", x1: from.x, y1: from.y, x2: next.x, y2: next.y, life: 0.12, color: "#e9d5ff", w: 3 });
+    }
+  }
+
+  blast(b) {
+    const x = b.x;
+    const y = b.y;
+    if (!b.shape) this.explode(x, y, b.radius, b.dmg);
+    else this.shapeBlast(b);
+    if (b.core) this.explode(x, y, b.radius, b.dmg);
+    if (b.bombs) {
+      const spread = (b.radius || 70) * (b.bombSpread || 1);
+      for (let i = 0; i < b.bombs; i++) {
+        const a = (Math.PI * 2 * i) / b.bombs;
+        const bx = x + Math.cos(a) * spread * 0.65;
+        const by = y + Math.sin(a) * spread * 0.65;
+        this.explode(bx, by, 36 * (b.bombSpread || 1), b.dmg * (b.bombMul || 0.55));
+        if (b.twice) this.explode(bx, by, 28, b.dmg * (b.bombMul || 0.55) * 0.6);
+      }
+    }
+    if (b.pool) {
+      this.run.pools.push({
+        x,
+        y,
+        r: b.poolAll ? Math.hypot(this.worldW, this.worldH) : b.radius,
+        life: b.pool,
+        dps: b.poolDmg,
+        resin: b.resin,
+        pull: b.pull,
+        pit: b.pit,
+        magma: b.magma,
+      });
+    }
+    if (b.twin) this.fireGrenade(true);
+  }
+
+  shapeBlast(b) {
+    const ang = Math.atan2(b.vy, b.vx);
+    const arms = b.shape === "star" ? 4 : b.shape === "cross" ? 2 : 1;
+    const reach = (b.radius || 88) * (b.reach || 1.3);
+    const width = b.width || 0.7;
+    this.run.fx.push({ kind: "ring", x: b.x, y: b.y, r: 8, max: b.radius, life: 0.25, color: "#fb7185" });
+    for (let arm = 0; arm < arms; arm++) {
+      const a = ang + (arm * Math.PI) / arms;
+      const x2 = b.x + Math.cos(a) * reach;
+      const y2 = b.y + Math.sin(a) * reach;
+      this.run.fx.push({ kind: "beam", x1: b.x, y1: b.y, x2, y2, life: 0.16, color: "#fb7185", w: 10 + width * 8 });
+      for (const e of this.run.enemies) {
+        if (e.dead) continue;
+        const rel = normAng(angTo(b, e) - a);
+        if (Math.abs(rel) < width && dist(b, e) < reach + e.r) this.damage(e, b.dmg, "#fb7185");
+      }
     }
   }
 
@@ -913,6 +1144,14 @@ export class Game {
         if (id === "emp") this.fireEmp();
         st.timer = st.cd;
       }
+      if (id === "scatter" && st.pending > 0) {
+        st.pendingIn -= dt;
+        if (st.pendingIn <= 0) {
+          st.pending = 0;
+          const t = this.nearest(r.tower);
+          if (t) this.scatterVolley(st, t);
+        }
+      }
       if (id === "laser" && st.spin) st.spinAngle = (st.spinAngle || 0) + dt * 1.8;
       if (id === "emp" && st.pending > 0) {
         st.pendingIn -= dt;
@@ -935,18 +1174,29 @@ export class Game {
     }
     r.beams = r.beams.filter((beam) => beam.life > 0);
 
-    if (r.weapons.orb && r.wepStats.orb) {
-      const o = r.wepStats.orb;
-      r.orbAngle += o.spin * dt;
-      for (let i = 0; i < o.count; i++) {
-        const a = r.orbAngle + (i * Math.PI * 2) / o.count;
-        const ox = tw.x + Math.cos(a) * o.radius;
-        const oy = tw.y + Math.sin(a) * o.radius;
-        for (const e of r.enemies) {
-          if (!e.dead && dist(e, { x: ox, y: oy }) < e.r + 12) this.damage(e, o.dmg * dt * 8, "#34d399", false);
+    if (r.weapons.orb && r.wepStats.orb) this.updateOrbs(dt, tw);
+    for (const pool of r.pools) {
+      pool.life -= dt;
+      for (const e of r.enemies) {
+        if (e.dead || dist(e, pool) > pool.r) continue;
+        e.hp -= pool.dps * dt;
+        e.slow = Math.max(e.slow || 0, pool.resin ? 0.25 : 0.4);
+        e.slowMul = 0.2;
+        if (pool.pit) e.freeze = Math.max(e.freeze || 0, pool.pit);
+        if (pool.pull) {
+          const a = angTo(e, pool);
+          e.x += Math.cos(a) * 70 * dt;
+          e.y += Math.sin(a) * 70 * dt;
+        }
+        if (e.hp <= 0) {
+          const x = e.x;
+          const y = e.y;
+          this.kill(e);
+          if (pool.magma) this.explode(x, y, 56, pool.dps);
         }
       }
     }
+    r.pools = r.pools.filter((pool) => pool.life > 0);
 
     if (r.weapons.drone && r.drone) {
       this.syncDrones();
@@ -1099,10 +1349,16 @@ export class Game {
         if (emp?.prison) e.slow = Math.max(e.slow || 0, emp.prison);
       }
       if (dist(e, tw) < e.r + tw.r && tw.hitCd <= 0) {
-        if (tw.guard > 0) {
-          tw.guard -= 1;
+        const orb = r.wepStats.orb;
+        const blocked = tw.guard > 0 || (orb?.branch === "ward" && orb.guard > 0);
+        if (blocked) {
+          if (tw.guard > 0) tw.guard -= 1;
+          else orb.guard -= 1;
           tw.hitCd = 0.35;
-          this.burst(tw.x, tw.y, "#c084fc", 10);
+          this.burst(tw.x, tw.y, "#34d399", 10);
+          if (orb?.reflect) this.damage(e, e.dmg * 3, "#34d399");
+          if (orb?.flash) this.explode(tw.x, tw.y, orb.radius, orb.dmg * 6);
+          if (orb?.mend) tw.hp = Math.min(tw.maxHp, tw.hp + orb.mend);
           continue;
         }
         tw.hp -= e.dmg;
@@ -1130,7 +1386,7 @@ export class Game {
       const bounce = reflectBullet(b, this.worldW, this.worldH);
       if (bounce?.swarm && !bounce.died) this.spawnSwarm(b);
       if (b.kind === "nade" && (b.life < 0.05 || this.hitAny(b))) {
-        this.explode(b.x, b.y, b.radius, b.dmg);
+        this.blast(b);
         b.life = 0;
         continue;
       }
@@ -1144,6 +1400,12 @@ export class Game {
             e.x += Math.cos(a) * b.knock * 0.12;
             e.y += Math.sin(a) * b.knock * 0.12;
           }
+          if (b.bog || b.cordon) {
+            e.slow = Math.max(e.slow || 0, 1);
+            e.slowMul = b.cordon ? 0.05 : 0.12;
+          }
+          if (b.cluster && b.shards && !e.dead) this.burstPellets(e.x, e.y, b.shards, b.dmg * (b.shardMul || 0.45), b.shardLife || 0.16, b.shardPierce || 0, !!b.echo);
+          if (b.avalanche && e.dead) this.burstPellets(e.x, e.y, b.shards || 4, b.dmg * 0.5, 0.2, 0, false);
           b.hit.add(e);
           if (bulletShouldStop(b)) {
             if (b.bombRadius) this.explode(b.x, b.y, b.bombRadius, b.bombDmg);
@@ -1228,13 +1490,31 @@ export class Game {
 
     if (this.run.weapons.orb && this.run.wepStats.orb) {
       const o = this.run.wepStats.orb;
+      const spots = o.spots || [];
       for (let i = 0; i < o.count; i++) {
-        const a = this.run.orbAngle + (i * Math.PI * 2) / o.count;
+        const spot = spots[i] || this.orbHome(o, i, tw);
         ctx.fillStyle = "#34d399";
         ctx.beginPath();
-        ctx.arc(tw.x + Math.cos(a) * o.radius, tw.y + Math.sin(a) * o.radius, 9, 0, Math.PI * 2);
+        ctx.arc(spot.x, spot.y, o.branch === "blade" ? 6 : 9, 0, Math.PI * 2);
         ctx.fill();
+        if (o.branch === "blade") {
+          const a = Math.atan2(spot.y - tw.y, spot.x - tw.x);
+          ctx.strokeStyle = "#34d399";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(spot.x, spot.y);
+          ctx.lineTo(spot.x + Math.cos(a + 1.2) * 18 * (o.reach || 1), spot.y + Math.sin(a + 1.2) * 18 * (o.reach || 1));
+          ctx.stroke();
+        }
       }
+    }
+    for (const pool of this.run.pools || []) {
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = "#fb7185";
+      ctx.beginPath();
+      ctx.arc(pool.x, pool.y, Math.min(pool.r, 280), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     }
     for (const d of this.run.drones) {
       ctx.fillStyle = "#f472b6";

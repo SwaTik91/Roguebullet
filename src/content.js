@@ -110,13 +110,13 @@ export function defaultWep(id) {
     case "laser":
       return { dmg: 28, cd: 0.72, width: 7, timer: 0, branch: null, rays: 1, spread: 0.28, bounces: 0, edgeMul: 1, burn: 0 };
     case "scatter":
-      return { dmg: 9, cd: 1.05, n: 6, knock: 70, timer: 0 };
+      return { dmg: 9, cd: 1.05, n: 6, knock: 70, gap: 0.09, pierce: 0, timer: 0, branch: null, centerMul: 1, shards: 0, shardMul: 0.45 };
     case "grenade":
-      return { dmg: 46, cd: 1.7, radius: 88, timer: 0 };
+      return { dmg: 46, cd: 1.7, radius: 88, timer: 0, branch: null, bombs: 0, bombMul: 0.55, poolDmg: 16 };
     case "emp":
       return { dmg: 22, cd: 3.1, radius: 170, slow: 0.45, slowMul: 0.45, slowDur: 1.15, hits: 1, knock: 0, timer: 0, branch: null };
     case "orb":
-      return { dmg: 10, count: 2, radius: 92, spin: 1.8 };
+      return { dmg: 10, count: 2, radius: 92, spin: 1.8, branch: null, reach: 1, fly: [] };
     case "drone":
       return { dmg: 11, count: 1, cd: 0.28, bombs: false, timer: 0 };
     default:

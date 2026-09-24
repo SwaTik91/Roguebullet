@@ -1,6 +1,9 @@
 import { defaultWep } from "./content.js";
 import { dronePool, droneStep } from "./drone.js";
 import { empStep } from "./emp.js";
+import { grenadeStep } from "./grenade.js";
+import { orbStep } from "./orb.js";
+import { scatterStep } from "./scatter.js";
 import { addCrit, gunPool, gunStep } from "./gun.js";
 import { laserStep } from "./laser.js";
 
@@ -123,75 +126,6 @@ function unlockCard(spec) {
   }), unlock: true };
 }
 
-const SIDE_LEGEND = {
-  scatter: {
-    5: [
-      card("sc-l5a", "Шрапнель", "+6 дробинок", "legendary", (r) => (r.wepStats.scatter.n += 6)),
-      card("sc-l5b", "Таран", "Урон дроби ×2", "legendary", (r) => (r.wepStats.scatter.dmg *= 2)),
-      card("sc-l5c", "Отбой", "Отброс ×2", "legendary", (r) => (r.wepStats.scatter.knock *= 2)),
-    ],
-    10: [
-      card("sc-l10a", "Облако", "+8 дробинок", "legendary", (r) => (r.wepStats.scatter.n += 8)),
-      card("sc-l10b", "Молот", "Урон дроби ×2", "legendary", (r) => (r.wepStats.scatter.dmg *= 2)),
-      card("sc-l10c", "Частый залп", "Дробь стреляет чаще", "legendary", (r) => (r.wepStats.scatter.cd *= 0.6)),
-    ],
-    15: [
-      card("sc-l15a", "Буря", "+10 дробинок и урон ×2", "legendary", (r) => {
-        r.wepStats.scatter.n += 10;
-        r.wepStats.scatter.dmg *= 2;
-      }),
-      card("sc-l15b", "Стена дроби", "Отброс ×2 и урон ×2", "legendary", (r) => {
-        r.wepStats.scatter.knock *= 2;
-        r.wepStats.scatter.dmg *= 2;
-      }),
-      card("sc-l15c", "Автомат", "Дробь стреляет вдвое чаще", "legendary", (r) => (r.wepStats.scatter.cd *= 0.5)),
-    ],
-  },
-  grenade: {
-    5: [
-      card("gr-l5a", "Воронка", "Радиус ×2", "legendary", (r) => (r.wepStats.grenade.radius *= 2)),
-      card("gr-l5b", "Бризант", "Урон заряда ×2", "legendary", (r) => (r.wepStats.grenade.dmg *= 2)),
-      card("gr-l5c", "Серия", "Заряды вдвое чаще", "legendary", (r) => (r.wepStats.grenade.cd *= 0.5)),
-    ],
-    10: [
-      card("gr-l10a", "Кратер", "Радиус ещё ×1.6", "legendary", (r) => (r.wepStats.grenade.radius *= 1.6)),
-      card("gr-l10b", "Тонна", "Урон ×2", "legendary", (r) => (r.wepStats.grenade.dmg *= 2)),
-      card("gr-l10c", "Канонада", "Заряды чаще и больнее", "legendary", (r) => {
-        r.wepStats.grenade.cd *= 0.7;
-        r.wepStats.grenade.dmg *= 1.5;
-      }),
-    ],
-    15: [
-      card("gr-l15a", "Эпицентр", "Радиус ×2 и урон ×2", "legendary", (r) => {
-        r.wepStats.grenade.radius *= 2;
-        r.wepStats.grenade.dmg *= 2;
-      }),
-      card("gr-l15b", "Ковёр", "Заряды вдвое чаще", "legendary", (r) => (r.wepStats.grenade.cd *= 0.5)),
-      card("gr-l15c", "Осадный", "Урон ×3", "legendary", (r) => (r.wepStats.grenade.dmg *= 3)),
-    ],
-  },
-  orb: {
-    5: [
-      card("orb-l5a", "Кольцо", "+2 орбиты", "legendary", (r) => (r.wepStats.orb.count += 2)),
-      card("orb-l5b", "Шипы+", "Урон орбит ×2", "legendary", (r) => (r.wepStats.orb.dmg *= 2)),
-      card("orb-l5c", "Орбита шире", "Радиус ×1.6", "legendary", (r) => (r.wepStats.orb.radius *= 1.6)),
-    ],
-    10: [
-      card("orb-l10a", "Рой+", "+2 орбиты", "legendary", (r) => (r.wepStats.orb.count += 2)),
-      card("orb-l10b", "Иглы", "Урон ×2", "legendary", (r) => (r.wepStats.orb.dmg *= 2)),
-      card("orb-l10c", "Карусель", "Орбиты крутятся быстрее", "legendary", (r) => (r.wepStats.orb.spin *= 1.8)),
-    ],
-    15: [
-      card("orb-l15a", "Сфера", "+3 орбиты и урон ×2", "legendary", (r) => {
-        r.wepStats.orb.count += 3;
-        r.wepStats.orb.dmg *= 2;
-      }),
-      card("orb-l15b", "Ореол", "Радиус ×2", "legendary", (r) => (r.wepStats.orb.radius *= 2)),
-      card("orb-l15c", "Вихрь", "Урон ×3", "legendary", (r) => (r.wepStats.orb.dmg *= 3)),
-    ],
-  },
-};
-
 export function weaponMilestone(pipCount) {
   const next = pipCount + 1;
   if (next === 5 || next === 10 || next === 15) return next;
@@ -219,8 +153,22 @@ export function legendaryOffer(run, weaponKey) {
     const level = emp?.branch ? next : 5;
     return tag(empStep(level, emp?.branch).cards, "Импульс");
   }
-  const who = UNLOCKS.find((spec) => spec.id === weaponKey)?.title || weaponKey;
-  return tag(SIDE_LEGEND[weaponKey]?.[next] || [], who);
+  if (weaponKey === "scatter") {
+    const scatter = run.wepStats?.scatter;
+    const level = scatter?.branch ? next : 5;
+    return tag(scatterStep(level, scatter?.branch).cards, "Дробь");
+  }
+  if (weaponKey === "grenade") {
+    const grenade = run.wepStats?.grenade;
+    const level = grenade?.branch ? next : 5;
+    return tag(grenadeStep(level, grenade?.branch).cards, "Заряд");
+  }
+  if (weaponKey === "orb") {
+    const orb = run.wepStats?.orb;
+    const level = orb?.branch ? next : 5;
+    return tag(orbStep(level, orb?.branch).cards, "Орбиты");
+  }
+  return [];
 }
 
 function invested(run, key) {
