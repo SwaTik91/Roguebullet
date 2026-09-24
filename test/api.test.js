@@ -132,6 +132,36 @@ test("unequipPart posts slot to /parts/unequip", async () => {
   assert.equal(calls[0].options.method, "POST");
 });
 
+test("devCrystals posts the amount", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: { getItem: () => "abc", setItem: () => {} },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ profile: {} }) };
+    },
+  });
+  await api.devCrystals(100);
+  assert.equal(calls[0].url, "http://api.test/dev/crystals");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { amount: 100 });
+});
+
+test("devPart posts the rarity", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: { getItem: () => "abc", setItem: () => {} },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ profile: {} }) };
+    },
+  });
+  await api.devPart("legendary");
+  assert.equal(calls[0].url, "http://api.test/dev/part");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { rarity: "legendary" });
+});
+
 test("rollPart posts the body to /parts/roll", async () => {
   const calls = [];
   const api = createApi({

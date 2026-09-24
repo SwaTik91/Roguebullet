@@ -88,6 +88,14 @@ def make_handler(store, battles=None):
                 body = self._body()
                 self._send_json(200, store.unequip_part(self._token(), body.get("slot")))
                 return
+            if method == "POST" and path == "/dev/crystals":
+                body = self._body()
+                self._send_json(200, store.dev_crystals(self._token(), body.get("amount") or 100))
+                return
+            if method == "POST" and path == "/dev/part":
+                body = self._body()
+                self._send_json(200, store.dev_part(self._token(), body.get("rarity"), random.random))
+                return
             if method == "POST" and path == "/battle/start":
                 body = self._body()
                 token = self._token()

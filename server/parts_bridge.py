@@ -29,14 +29,16 @@ def _call(payload):
         raise ValueError("parts bridge returned invalid json") from exc
 
 
-def roll_part(rng, owned_weapons, part_id):
-    values = [rng() for _ in range(24)]
+def roll_part(rng, owned_weapons, part_id, rarity=None):
+    options = {"id": part_id}
+    if rarity:
+        options["rarity"] = rarity
     part = _call(
         {
             "cmd": "rollPart",
-            "rngValues": values,
+            "rngValues": [rng() for _ in range(24)],
             "ownedWeapons": owned_weapons,
-            "options": {"id": part_id},
+            "options": options,
         }
     )
     if isinstance(part, dict) and part.get("error"):

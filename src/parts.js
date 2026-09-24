@@ -242,7 +242,7 @@ export function rollPart(rng, ownedWeapons, options = {}) {
   }
 
   const baseEntry = baseList[pickIndex(rng, baseList.length)];
-  const rarity = rollRarity(rng);
+  const rarity = RARITY_STEP[options.rarity] ? options.rarity : rollRarity(rng);
   const affixes = pickTwoAffixes(rng, family, rarity);
 
   const part = {

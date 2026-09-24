@@ -172,6 +172,28 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(equipped["profile"]["loadout"][4], "c1")
         self.assertIsNone(equipped["profile"]["loadout"][0])
 
+    def test_dev_grants_crystals_and_a_part_of_the_asked_rarity(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        before = self.store.account_for_token(token)["crystals"]
+        granted = self.store.dev_crystals(token, 100)
+        self.assertEqual(granted["granted"], 100)
+        self.assertEqual(granted["profile"]["crystals"], before + 100)
+
+        def roller(_rng, _owned, rarity):
+            return {
+                "base": "antenna",
+                "baseName": "Антенна",
+                "family": "emp",
+                "rarity": "common",
+                "affixes": [{"id": "dmg", "name": "урон", "step": 1}],
+            }
+
+        dropped = self.store.dev_part(token, "legendary", lambda: 0.1, roller=roller)
+        self.assertEqual(dropped["part"]["rarity"], "legendary")
+        self.assertEqual(len(dropped["profile"]["parts"]), 1)
+        with self.assertRaises(ValueError):
+            self.store.dev_part(token, "mythic", lambda: 0.1, roller=roller)
+
 
 class HandlerTests(unittest.TestCase):
     def test_register_then_me(self):

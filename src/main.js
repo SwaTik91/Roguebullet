@@ -180,6 +180,7 @@ const SCREENS = [
   "screen-achievements",
   "screen-how",
   "screen-settings",
+  "screen-dev",
   "screen-cards",
   "screen-result",
   "screen-level-clear",
@@ -536,6 +537,29 @@ $("btn-parts").onclick = () => {
   renderParts();
 };
 $("btn-parts-back").onclick = () => showMenu();
+$("btn-dev").onclick = () => {
+  openScreen("screen-dev");
+  $("dev-crystals").textContent = String(profile?.crystals || 0);
+};
+$("btn-dev-back").onclick = () => showMenu();
+$("btn-dev-crystals").onclick = () => {
+  purchase(async () => {
+    const result = await api.devCrystals(100);
+    $("dev-crystals").textContent = String(result.profile?.crystals || 0);
+    ui.toast("+100 кристаллов");
+    return result;
+  });
+};
+for (const rarity of ["common", "rare", "epic", "legendary"]) {
+  $(`btn-dev-${rarity}`).onclick = () => {
+    purchase(async () => {
+      const result = await api.devPart(rarity);
+      const part = result.part;
+      if (part) ui.toast(`${part.baseName || part.base} · ${partFamilyLabel(part.family)}`);
+      return result;
+    });
+  };
+}
 $("btn-shop").onclick = () => {
   openScreen("screen-shop");
   renderShop();

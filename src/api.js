@@ -89,6 +89,12 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     rollPart(body) {
       return request("/parts/roll", { method: "POST", body });
     },
+    devCrystals(amount = 100) {
+      return request("/dev/crystals", { method: "POST", body: { amount } });
+    },
+    devPart(rarity) {
+      return request("/dev/part", { method: "POST", body: { rarity } });
+    },
     battleStart(body) {
       return request("/battle/start", { method: "POST", body });
     },

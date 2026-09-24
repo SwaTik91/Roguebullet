@@ -609,6 +609,42 @@ class Store:
             raise
         return {"part": part, "profile": profile}
 
+    def dev_crystals(self, token, amount=100):
+        amount = int(amount or 100)
+        if amount < 1 or amount > 1000:
+            raise ValueError("Некорректная сумма")
+        account_id = self._account_row(token)["id"]
+        self.db.execute(
+            "UPDATE accounts SET crystals = crystals + ? WHERE id = ?",
+            (amount, account_id),
+        )
+        self.db.commit()
+        return {"granted": amount, "profile": self._profile(account_id)}
+
+    def dev_part(self, token, rarity, rng, roller=None):
+        rarity = str(rarity or "").strip()
+        if rarity not in ("common", "rare", "epic", "legendary"):
+            raise ValueError("Некорректная редкость")
+        account_id = self._account_row(token)["id"]
+        owned = list(self._owned_weapon_families(account_id))
+        part_id = secrets.token_hex(16)
+        if roller is None:
+            part = parts_bridge.roll_part(rng, owned, part_id, rarity)
+        else:
+            part = roller(rng, owned, rarity)
+            if not part.get("id"):
+                part = {**part, "id": part_id}
+            part = {**part, "rarity": rarity}
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            self._insert_part(account_id, part)
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"part": part, "profile": profile}
+
     def equip_part(self, token, part_id):
         part_id = str(part_id or "").strip()
         if not part_id:

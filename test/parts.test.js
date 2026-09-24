@@ -66,6 +66,13 @@ test("describeAffix keeps a leading zero on negative cooldown", () => {
   assert.equal(text, "перезарядка дрона: -0.02");
 });
 
+test("forced rarity ignores the rarity roll", () => {
+  const part = rollPart(() => 0, [], { rarity: "legendary" });
+  assert.equal(part.rarity, "legendary");
+  assert.equal(part.affixes[0].step, 4);
+  assert.equal(part.affixes[1].step, 4);
+});
+
 test("part affix ids differ", () => {
   for (let i = 0; i < 200; i++) {
     const p = rollPart(Math.random, ["laser", "scatter"]);
