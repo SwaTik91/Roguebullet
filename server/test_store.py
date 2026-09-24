@@ -45,6 +45,22 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(first["profile"]["xp"], 22)
         self.assertEqual(first["profile"]["coins"], 36)
 
+    def test_endless_claim_grants_five_once_per_level_wave(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        first = self.store.claim_endless(token, 1, 3)
+        self.assertEqual(first["granted"], 5)
+        self.assertEqual(first["crystals"], 5)
+        self.assertEqual(first["profile"]["crystals"], 5)
+        second = self.store.claim_endless(token, 1, 3)
+        self.assertEqual(second["granted"], 0)
+        self.assertEqual(second["crystals"], 5)
+        other = self.store.claim_endless(token, 1, 4)
+        self.assertEqual(other["granted"], 5)
+        self.assertEqual(other["crystals"], 10)
+        self.assertEqual(other["profile"]["crystals"], 10)
+        with self.assertRaises(ValueError):
+            self.store.claim_endless(token, 0, 1)
+
 
 class HandlerTests(unittest.TestCase):
     def test_register_then_me(self):
@@ -55,6 +71,16 @@ class HandlerTests(unittest.TestCase):
         token = body["token"]
         status, me = call(handler_cls, "GET", "/me", None, token)
         self.assertEqual(me["profile"]["coins"], 0)
+        status, claimed = call(handler_cls, "POST", "/endless", {"level": 2, "wave": 40}, token)
+        self.assertEqual(status, 200)
+        self.assertEqual(claimed["granted"], 5)
+        self.assertEqual(set(claimed), {"granted", "crystals", "profile"})
+        status, repeat = call(handler_cls, "POST", "/endless", {"level": 2, "wave": 40}, token)
+        self.assertEqual(repeat["granted"], 0)
+        self.assertEqual(repeat["crystals"], claimed["crystals"])
+        status, bad = call(handler_cls, "POST", "/endless", {"level": 9, "wave": 1}, token)
+        self.assertEqual(status, 400)
+        self.assertEqual(bad, {"error": "Некорректный уровень"})
         os.remove(store.path)
 
 

@@ -48,6 +48,7 @@
           <strong id="combo-text">△ × 3</strong>
         </div>
         <div id="weapons" class="weapons"></div>
+        <button id="btn-speed" class="speed-btn" type="button">×1</button>
       </div>
 
       <div id="screen-login" class="screen">
@@ -139,7 +140,8 @@
           <li><b>Враги со всех сторон</b> — сверху, снизу, слева и справа.</li>
           <li><b>Резонанс форм</b> — серия убийств одного типа взрывает призму.</li>
           <li><b>Выбор уровня.</b> Следующий открывается после предыдущего. С выбранного уровня бой идёт дальше, до третьего.</li>
-          <li><b>Пулемёт и дрон</b> — у каждого 15 уровней. На обычном уровне три карты, на 5, 10 и 15 — легендарки ветки.</li>
+          <li><b>Усиление</b> — один выбор из трёх: оружие, его улучшение или общая карта.</li>
+          <li><b>После уровня</b> — награда, потом следующий уровень, меню или бесконечный режим.</li>
         </ul>
         <button class="btn primary" id="btn-how-back">ПОНЯТНО</button>
       </div>
@@ -156,6 +158,18 @@
         <h2 id="cards-title">УСИЛЕНИЕ</h2>
         <p id="cards-sub" class="sub">Выбери одну карту</p>
         <div id="card-row" class="card-row"></div>
+      </div>
+
+      <div id="screen-level-clear" class="screen hidden">
+        <h2 id="clear-title">УРОВЕНЬ ПРОЙДЕН</h2>
+        <p id="clear-note" class="sub"></p>
+        <div class="result-grid">
+          <div><span>Монеты уровня</span><b id="clear-coins">0</b></div>
+          <div><span>Кристаллы</span><b id="clear-crystals">0</b></div>
+        </div>
+        <button class="btn primary" id="btn-next-level">СЛЕДУЮЩИЙ УРОВЕНЬ</button>
+        <button class="btn" id="btn-endless">БЕСКОНЕЧНЫЙ РЕЖИМ</button>
+        <button class="btn" id="btn-clear-menu">В МЕНЮ</button>
       </div>
 
       <div id="screen-result" class="screen hidden">

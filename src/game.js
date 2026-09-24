@@ -1,6 +1,6 @@
 import { SHAPES, WEAPON_INFO, enemyForWave, waveCount } from "./content.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
-import { droneStep } from "./drone.js";
+import { rollBattleOffer } from "./draft.js";
 import { api, newId } from "./api.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
@@ -33,6 +33,7 @@ export class Game {
     this.stars = [];
     this.pointer = { down: false, x: 360, y: 200 };
     this.shake = 0;
+    this.speed = 1;
     this.state = "boot";
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -121,7 +122,11 @@ export class Game {
       comboFlash: 0,
       bossIntro: 0,
       bossPulse: 0,
-      overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85 },
+      overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85, chargeGain: 0 },
+      offer: { level: 1, xp: 0, next: gunXpToNext(1) },
+      endless: false,
+      power: 1,
+      levelCoins: 0,
       weapons: { gun: true, drone: true },
       wepStats: {},
       drones: [],
@@ -190,7 +195,7 @@ export class Game {
     const { wave, chapter } = this.run;
     this.run.spawnQueue = [];
     this.run.wavePause = 0;
-    if (wave % 6 === 0) {
+    if (!this.run.endless && wave % 6 === 0) {
       this.run.bossIntro = 2.6;
       this.run.bossPulse = 0;
       this.shake = 12;
@@ -198,8 +203,9 @@ export class Game {
       this.ui.updateHud(this.run);
       return;
     }
-    const n = waveCount(wave);
-    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(wave, chapter));
+    const n = this.run.endless ? 1000 : waveCount(wave);
+    const power = this.run.power || 1;
+    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(Math.min(wave, 6), chapter, power));
     this.run.spawnTimer = 0.45;
     this.ui.updateHud(this.run);
   }
@@ -347,8 +353,7 @@ export class Game {
     else this.run.kills[bucket] += 1;
     this.run.coins += e.coins;
     this.run.xp += e.xp;
-    this.gainGunXp(1);
-    this.gainDroneXp(1);
+    this.gainOfferXp(1);
     this.audio.hit();
     this.burst(e.x, e.y, e.color, e.boss ? 28 : 12);
     this.shake = Math.max(this.shake, e.boss ? 10 : 3);
@@ -380,44 +385,21 @@ export class Game {
     this.ui.updateHud(this.run);
   }
 
-  gainGunXp(amount) {
-    const gun = this.run?.gun;
-    if (!gun || gun.level >= 15) return;
-    gun.xp += amount;
-    while (gun.level < 15 && gun.xp >= gun.next && this.state === "play") {
-      gun.xp -= gun.next;
-      gun.level += 1;
-      gun.next = gunXpToNext(gun.level);
-      const step = gunStep(gun.level, gun.branch);
-      if (!step) break;
-      if (step.kind === "choice") {
-        this.state = "cards";
-        this.ui.showCards(step.cards, { title: `ПУЛЕМЁТ ${gun.level}`, sub: step.sub });
-        break;
-      }
-      step.apply(this.run);
-      this.ui.toast(`Ур. ${gun.level} · ${step.desc}`);
-    }
-  }
-
-  gainDroneXp(amount) {
-    const drone = this.run?.drone;
-    if (!drone || drone.level >= 15) return;
-    drone.xp += amount;
-    while (drone.level < 15 && drone.xp >= drone.next && this.state === "play") {
-      drone.xp -= drone.next;
-      drone.level += 1;
-      drone.next = gunXpToNext(drone.level);
-      const step = droneStep(drone.level, drone.branch);
-      if (!step) break;
-      if (step.kind === "choice") {
-        this.state = "cards";
-        this.ui.showCards(step.cards, { title: `ДРОН ${drone.level}`, sub: step.sub });
-        break;
-      }
-      step.apply(this.run);
-      this.syncDrones();
-      this.ui.toast(`Дрон ${drone.level} · ${step.desc}`);
+  gainOfferXp(amount) {
+    const offer = this.run?.offer;
+    if (!offer || offer.level >= 15) return;
+    offer.xp += amount;
+    while (offer.level < 15 && offer.xp >= offer.next && this.state === "play") {
+      offer.xp -= offer.next;
+      offer.level += 1;
+      offer.next = gunXpToNext(offer.level);
+      const cards = rollBattleOffer(this.run);
+      this.state = "cards";
+      this.ui.showCards(cards, {
+        title: `УСИЛЕНИЕ ${offer.level}`,
+        sub: "Одно усиление: оружие или общая карта",
+      });
+      break;
     }
   }
 
@@ -438,8 +420,7 @@ export class Game {
     this.ui.updateHud(this.run);
     this.audio.pickup();
     this.syncDrones();
-    this.gainGunXp(0);
-    this.gainDroneXp(0);
+    this.gainOfferXp(0);
   }
 
   syncDrones() {
@@ -489,7 +470,7 @@ export class Game {
         hit: new Set(),
       });
     }
-    const gain = 1.6 * (1 + this.meta.charge * 0.18);
+    const gain = 1.6 * (1 + this.meta.charge * 0.18) * (1 + (this.run.overdrive.chargeGain || 0));
     if (this.run.overdrive.left <= 0) this.run.overdrive.charge += gain;
     if (this.run.overdrive.charge >= this.run.overdrive.max) {
       this.run.overdrive.charge = 0;
@@ -623,9 +604,25 @@ export class Game {
     this.run.fx.push({ kind: "ring", x, y, r: 8, max: 48, life: 0.25, color });
   }
 
-  advanceLevel() {
+  showLevelClear() {
     const r = this.run;
     r.levelsCleared += 1;
+    this.state = "levelclear";
+    const coins = r.coins - (r.levelCoins || 0);
+    const first = { 1: 8, 2: 12, 3: 20 };
+    const cleared = new Set(this.profile?.clearedLevels || []);
+    const crystals = cleared.has(r.level) ? 0 : first[r.level] || 0;
+    this.audio.win();
+    this.ui.showLevelClear({
+      level: r.level,
+      coins,
+      crystals,
+      canNext: r.level < LEVELS,
+    });
+  }
+
+  continueLevel() {
+    const r = this.run;
     if (r.level >= LEVELS) {
       this.end(true);
       return;
@@ -633,18 +630,40 @@ export class Game {
     r.level += 1;
     r.chapter = r.level;
     r.wave = 1;
+    r.endless = false;
+    r.power = 1;
+    r.levelCoins = r.coins;
     r.tower.hp = r.tower.maxHp;
     r.enemies = [];
     r.bullets = [];
     r.spawnQueue = [];
     r.combo = 0;
     r.comboType = null;
-    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, r.level);
-    this.ui.save();
+    this.state = "play";
+    this.ui.hideLevelClear();
     this.ui.updateHud(r);
-    this.ui.toast(`УРОВЕНЬ ${r.level}`);
-    this.audio.win();
     this.queueWave();
+  }
+
+  beginEndless() {
+    const r = this.run;
+    r.endless = true;
+    r.power = 2;
+    r.wave = 7;
+    r.tower.hp = r.tower.maxHp;
+    r.enemies = [];
+    r.bullets = [];
+    r.spawnQueue = [];
+    this.state = "play";
+    this.ui.hideLevelClear();
+    this.ui.toast("БЕСКОНЕЧНЫЙ РЕЖИМ");
+    this.queueWave();
+  }
+
+  exitAfterLevel() {
+    const r = this.run;
+    const won = r.levelsCleared >= LEVELS && (r.startedLevel || 1) === 1;
+    this.end(won);
   }
 
   facts() {
@@ -652,10 +671,10 @@ export class Game {
       runId: this.run.runId,
       startedLevel: this.run.startedLevel || 1,
       kills: { ...this.run.kills },
-      wavesCleared: this.run.wavesCleared,
+      wavesCleared: Math.min(18, this.run.wavesCleared),
       levelsCleared: this.run.levelsCleared,
       endedLevel: this.run.level,
-      endedWave: this.run.wave,
+      endedWave: Math.min(6, this.run.wave),
       won: !!this.run.won,
     };
   }
@@ -828,8 +847,21 @@ export class Game {
       r.wavePause += dt;
       if (r.wavePause > 1.15) {
         r.wavesCleared += 1;
+        if (r.endless) {
+          this.ui.onEndlessWave?.(r.level, r.wave);
+          r.power *= 2;
+          r.wave += 1;
+          if (r.wave > 40) {
+            this.exitAfterLevel();
+            this.draw(dt);
+            return;
+          }
+          this.queueWave();
+          this.draw(dt);
+          return;
+        }
         if (r.wave === 6) {
-          this.advanceLevel();
+          this.showLevelClear();
           this.draw(dt);
           return;
         }
@@ -1155,7 +1187,7 @@ export class Game {
   }
 
   loop(t) {
-    const dt = Math.min(0.033, (t - (this.last || t)) / 1000);
+    const dt = Math.min(0.033, (t - (this.last || t)) / 1000) * (this.speed || 1);
     this.last = t;
     this.update(dt);
     requestAnimationFrame((n) => this.loop(n));

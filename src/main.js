@@ -4,6 +4,7 @@ import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
 import { api, newId } from "./api.js";
+import { nextSpeed, speedLabel } from "./speed.js";
 import { retryPendingClaims } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
@@ -27,18 +28,13 @@ const ui = {
     $("hud-coins").textContent = String(run.coins);
     $("hud-crit").textContent = `${Math.round((run.crit?.chance || 0) * 100)}%`;
     const box = $("weapons");
-    const gun = run.gun;
-    const drone = run.drone;
-    const gunBranch = gun?.branch === "queue" ? "Очередь" : gun?.branch === "volley" ? "Залп" : gun?.branch === "ricochet" ? "Рикошет" : "ветка на 5 ур.";
-    const droneBranch = drone?.branch === "flock" ? "Стая" : drone?.branch === "bomb" ? "Бомбы" : drone?.branch === "hunt" ? "Охота" : "ветка на 5 ур.";
-    const line = (name, color, track, branch) => {
-      const progress = track.level >= 15 ? "макс" : `${track.xp}/${track.next}`;
-      return `<div class="wep"><b style="color:${color}">${name} ${track.level}/15</b>${branch} · ${progress}</div>`;
-    };
-    box.innerHTML = [
-      gun?.level ? line("Пулемёт", WEAPON_INFO.gun.color, gun, gunBranch) : "",
-      drone?.level ? line("Дрон", WEAPON_INFO.drone.color, drone, droneBranch) : "",
-    ].join("");
+    const offer = run.offer;
+    const names = Object.keys(run.weapons || {}).filter((k) => run.weapons[k]);
+    const progress = !offer ? "" : offer.level >= 15 ? "макс" : `${offer.xp}/${offer.next}`;
+    box.innerHTML = `<div class="wep"><b>Усиление ${offer?.level || 1}/15</b>${progress}</div>` + names.map((k) => {
+      const info = WEAPON_INFO[k];
+      return `<div class="wep"><b style="color:${info.color}">${info.name}</b></div>`;
+    }).join("");
   },
   setCombo(run) {
     const el = $("combo");
@@ -68,6 +64,30 @@ const ui = {
   },
   hideCards() {
     $("screen-cards").classList.add("hidden");
+  },
+  showLevelClear(info) {
+    $("hud").classList.add("hidden");
+    $("screen-level-clear").classList.remove("hidden");
+    $("clear-title").textContent = `УРОВЕНЬ ${info.level} ПРОЙДЕН`;
+    $("clear-coins").textContent = `+${info.coins}`;
+    $("clear-crystals").textContent = info.crystals ? `+${info.crystals}` : "0";
+    $("clear-note").textContent = info.crystals
+      ? "Кристаллы за первое прохождение придут вместе с наградой забега."
+      : "Этот уровень уже был пройден. Кристаллы за него больше не выдаются.";
+    $("btn-next-level").classList.toggle("hidden", !info.canNext);
+  },
+  hideLevelClear() {
+    $("screen-level-clear").classList.add("hidden");
+    $("hud").classList.remove("hidden");
+  },
+  async onEndlessWave(level, wave) {
+    try {
+      const result = await api.claimEndless(level, wave);
+      if (result.profile) applyProfile(result.profile);
+      ui.toast(result.granted ? `+${result.granted} кристаллов за волну ${wave}` : `Волна ${wave} уже была забрана`);
+    } catch {
+      ui.toast("Кристаллы за волну придут при появлении связи");
+    }
   },
   showResult(win, run, granted, extra = {}) {
     $("hud").classList.add("hidden");
@@ -118,6 +138,7 @@ const SCREENS = [
   "screen-settings",
   "screen-cards",
   "screen-result",
+  "screen-level-clear",
 ];
 const SHOP_WEAPONS = ["laser", "scatter", "grenade", "emp", "orb", "drone"];
 const DAILY_TITLES = {
@@ -411,6 +432,16 @@ $("btn-how-back").onclick = () => {
   ui.save();
   hideAll();
   $("screen-menu").classList.remove("hidden");
+};
+$("btn-speed").onclick = () => {
+  game.speed = nextSpeed(game.speed || 1);
+  $("btn-speed").textContent = speedLabel(game.speed);
+};
+$("btn-next-level").onclick = () => game.continueLevel();
+$("btn-endless").onclick = () => game.beginEndless();
+$("btn-clear-menu").onclick = () => {
+  ui.hideLevelClear();
+  game.exitAfterLevel();
 };
 $("btn-again").onclick = () => {
   hideAll();

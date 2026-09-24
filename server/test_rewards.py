@@ -5,8 +5,10 @@ from server.rewards import (
     buy_crystal_item,
     coin_reward,
     daily_tasks,
+    endless_crystals,
     first_clear_crystals,
     hangar_price,
+    validate_endless,
     ready_achievements,
     roll_chest,
     xp_reward,
@@ -36,6 +38,15 @@ class RewardTests(unittest.TestCase):
         self.assertEqual(autos, ["first_boss", "three_levels"])
         again, crystals2, autos2 = first_clear_crystals({1, 2, 3}, 3)
         self.assertEqual((again, crystals2, autos2), ([], 0, []))
+
+    def test_endless_wave_pays_five_and_rejects_a_bad_level(self):
+        self.assertEqual(endless_crystals(1, 1), 5)
+        self.assertEqual(endless_crystals(3, 40), 5)
+        self.assertEqual(validate_endless(2, 7), (2, 7))
+        with self.assertRaises(ValueError):
+            endless_crystals(0, 1)
+        with self.assertRaises(ValueError):
+            validate_endless(4, 1)
 
     def test_later_level_pays_only_after_earlier_ones(self):
         levels, crystals, autos = first_clear_crystals(set(), 1, 3)

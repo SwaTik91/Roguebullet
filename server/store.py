@@ -15,6 +15,7 @@ from server.rewards import (
     buy_crystal_item,
     coin_reward,
     daily_tasks,
+    endless_crystals,
     first_clear_crystals,
     hangar_price,
     ready_achievements,
@@ -118,6 +119,12 @@ class Store:
                 request_id TEXT NOT NULL,
                 response_json TEXT NOT NULL,
                 PRIMARY KEY (account_id, request_id)
+            );
+            CREATE TABLE IF NOT EXISTS endless_claims (
+                account_id INTEGER NOT NULL,
+                level INTEGER NOT NULL,
+                wave INTEGER NOT NULL,
+                PRIMARY KEY (account_id, level, wave)
             );
             """
         )
@@ -229,6 +236,32 @@ class Store:
             self.db.rollback()
             raise
         return json.loads(encoded)
+
+    def claim_endless(self, token, level, wave):
+        account_id = self._account_row(token)["id"]
+        payout = endless_crystals(level, wave)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            existing = self.db.execute(
+                "SELECT 1 FROM endless_claims WHERE account_id = ? AND level = ? AND wave = ?",
+                (account_id, level, wave),
+            ).fetchone()
+            granted = 0 if existing else payout
+            if not existing:
+                self.db.execute(
+                    "INSERT INTO endless_claims (account_id, level, wave) VALUES (?, ?, ?)",
+                    (account_id, level, wave),
+                )
+                self.db.execute(
+                    "UPDATE accounts SET crystals = crystals + ? WHERE id = ?",
+                    (granted, account_id),
+                )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"granted": granted, "crystals": profile["crystals"], "profile": profile}
 
     def buy_hangar(self, token, key):
         if key not in HANGAR_KEYS:

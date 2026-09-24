@@ -272,6 +272,25 @@ h2 {
   color: var(--cyan);
 }
 
+.speed-btn {
+  position: absolute;
+  right: 12px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0 14px;
+  border: 2px solid var(--cyan);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--cyan);
+  font-family: Orbitron, sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
 .card-row {
   width: min(520px, 100%);
   display: flex;

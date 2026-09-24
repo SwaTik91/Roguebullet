@@ -118,6 +118,19 @@ def achievement_crystals(achievement_id):
     return ACHIEVEMENT_CRYSTALS[achievement_id]
 
 
+def validate_endless(level, wave):
+    if type(level) is not int or level not in range(1, 4):
+        raise ValueError("Некорректный уровень")
+    if type(wave) is not int or wave not in range(1, 41):
+        raise ValueError("Некорректная волна")
+    return level, wave
+
+
+def endless_crystals(level, wave):
+    validate_endless(level, wave)
+    return 5
+
+
 def hangar_price(owned_level):
     return round(40 * math.pow(1.65, int(owned_level)))
 

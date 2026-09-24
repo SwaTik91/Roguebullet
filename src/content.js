@@ -148,8 +148,8 @@ export function pickCards(run, n = 3) {
   return out;
 }
 
-export function enemyForWave(wave, chapter) {
-  const scale = Math.pow(1.32, wave - 1) * (1 + (chapter - 1) * 0.42);
+export function enemyForWave(wave, chapter, power = 1) {
+  const scale = Math.pow(1.32, wave - 1) * (1 + (chapter - 1) * 0.42) * power;
   const table = [
     { type: "circle", hp: 40, speed: 58, dmg: 8, r: 16, color: "#7dd3fc", xp: 6, coins: 2 },
     { type: "triangle", hp: 26, speed: 92, dmg: 7, r: 14, color: "#fbbf24", xp: 7, coins: 2, zigzag: true },
@@ -179,7 +179,7 @@ export function enemyForWave(wave, chapter) {
   if (wave >= 5 && Math.random() < 0.2) idx = 4;
   const e = { ...table[idx] };
   e.hp *= scale;
-  e.dmg *= 1 + (wave - 1) * 0.06;
+  e.dmg *= (1 + (wave - 1) * 0.06) * power;
   return e;
 }
 

@@ -74,6 +74,9 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     claimDaily(id) {
       return request(`/dailies/${encodeURIComponent(id)}/claim`, { method: "POST", body: {} });
     },
+    claimEndless(level, wave) {
+      return request("/endless", { method: "POST", body: { level, wave } });
+    },
   };
 }
 

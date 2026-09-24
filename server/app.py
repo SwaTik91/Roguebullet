@@ -44,6 +44,10 @@ def make_handler(store):
                 now = datetime.now(timezone.utc).astimezone()
                 self._send_json(200, store.claim_run(self._token(), self._body(), now))
                 return
+            if method == "POST" and path == "/endless":
+                body = self._body()
+                self._send_json(200, store.claim_endless(self._token(), body.get("level"), body.get("wave")))
+                return
             if method == "POST" and path == "/hangar":
                 body = self._body()
                 self._send_json(200, store.buy_hangar(self._token(), body.get("key")))
