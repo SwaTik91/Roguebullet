@@ -135,9 +135,9 @@ export class Game {
       offerCount: gear.cards,
       drones: [],
       drone: {
-        dmg: 22,
+        dmg: 24,
         count: 1,
-        cd: 0.26,
+        cd: 0.24,
         bombs: false,
         radius: 64,
         bombMul: 1.6,
@@ -155,7 +155,7 @@ export class Game {
       orbAngle: 0,
       gun: {
         angle: -Math.PI / 2,
-        dmg: 14 * atk,
+        dmg: 17 * atk,
         rate: 8,
         pellets: 1,
         pierce: 0,

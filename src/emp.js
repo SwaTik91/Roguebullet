@@ -96,12 +96,12 @@ export function empStep(level, branch) {
         }),
         card("storm", "Разряд", "Урон ×2, импульс бьёт дважды", (r) => {
           r.wepStats.emp.branch = "storm";
-          r.wepStats.emp.dmg *= 2;
+          r.wepStats.emp.dmg *= 1.5;
           r.wepStats.emp.hits = 2;
         }),
         card("dome", "Купол", "Радиус ×2, врагов отталкивает от ядра", (r) => {
           r.wepStats.emp.branch = "dome";
-          r.wepStats.emp.radius *= 2;
+          r.wepStats.emp.radius *= 1.55;
           r.wepStats.emp.knock = 90;
         }),
       ],
