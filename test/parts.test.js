@@ -161,6 +161,56 @@ test("applyBonuses updates gun damage and tower hp", () => {
   applyBonuses(run, { gunDmg: 0.4, hp: 150 });
   assert.equal(run.gun.dmg, 17 * 1.4);
   assert.equal(run.tower.maxHp, 220 + 150);
+  assert.equal(run.tower.hp, 220 + 150);
+});
+
+function runWithWepStats(wepStats, extra = {}) {
+  return {
+    gun: { dmg: 17, rate: 8, pierce: 0, bounces: 0 },
+    tower: { maxHp: 220, hp: 220, regen: 0 },
+    crit: { chance: 0.08 },
+    overdrive: { chargeGain: 1, dur: 3.4 },
+    wepStats,
+    ...extra,
+  };
+}
+
+test("applyBonuses floors drone cooldown at 0.12", () => {
+  const run = runWithWepStats(
+    { drone: { dmg: 11, cd: 0.28, pierce: 0, life: 0 } },
+    { drone: { dmg: 11, cd: 0.28, pierce: 0, life: 0 } },
+  );
+  applyBonuses(run, { droneCd: -0.2 });
+  assert.equal(run.drone.cd, 0.12);
+  assert.equal(run.wepStats.drone.cd, 0.12);
+});
+
+test("applyBonuses caps laser width at 22 and floors cd at 0.35", () => {
+  const run = runWithWepStats({
+    laser: { dmg: 36, cd: 0.6, width: 14, bounces: 0 },
+  });
+  applyBonuses(run, { laserWidth: 20, laserCd: -0.4 });
+  assert.equal(run.wepStats.laser.width, 22);
+  assert.equal(run.wepStats.laser.cd, 0.35);
+});
+
+test("applyBonuses caps grenade radius at 140 and floors cd at 0.8", () => {
+  const run = runWithWepStats({
+    grenade: { dmg: 58, cd: 1.45, radius: 100, poolDmg: 20 },
+  });
+  applyBonuses(run, { grenadeRadius: 60, grenadeCd: -1 });
+  assert.equal(run.wepStats.grenade.radius, 140);
+  assert.equal(run.wepStats.grenade.cd, 0.8);
+});
+
+test("applyBonuses caps emp radius and slow duration and floors slow multiplier", () => {
+  const run = runWithWepStats({
+    emp: { dmg: 14, cd: 2.7, radius: 145, slowDur: 1.7, slowMul: 0.45 },
+  });
+  applyBonuses(run, { empRadius: 60, empSlowDur: 1.5, empSlowMul: -0.4 });
+  assert.equal(run.wepStats.emp.radius, 190);
+  assert.equal(run.wepStats.emp.slowDur, 2.6);
+  assert.equal(run.wepStats.emp.slowMul, 0.15);
 });
 
 test("unequip clears slot", () => {

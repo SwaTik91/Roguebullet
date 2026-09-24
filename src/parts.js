@@ -304,66 +304,9 @@ function slotFamily(slots, parts, index) {
   return p?.family ?? null;
 }
 
-function canPlaceWeapon(part, slots, parts, index) {
-  if (index < 0 || index > 3) return false;
-  const occupied = slots[index];
-  if (!occupied) return true;
-  const fam = slotFamily(slots, parts, index);
-  return fam === part.family;
-}
-
-function firstWeaponSlot(part, slots, parts) {
-  for (let i = 0; i < 4; i++) {
-    if (!slots[i]) return i;
-    if (slotFamily(slots, parts, i) === part.family) return i;
-  }
-  for (let i = 0; i < 4; i++) {
-    if (!slots[i]) return i;
-  }
-  return -1;
-}
-
 function firstCommonSlot(slots) {
   for (let i = 4; i < 8; i++) if (!slots[i]) return i;
   return -1;
-}
-
-function tryEquip(parts, slots, partId, index) {
-  const part = partById(parts, partId);
-  if (!part) return { error: "Нет свободного слота" };
-
-  if (equippedBases(slots, parts).has(part.base)) {
-    return { error: "Такая уже надета" };
-  }
-
-  if (part.family === null) {
-    if (index < 4) return { error: "Нет свободного слота" };
-    if (index < 0 || index > 7 || slots[index]) return { error: "Нет свободного слота" };
-    const next = [...slots];
-    next[index] = partId;
-    return { slots: next };
-  }
-
-  if (index >= 0) {
-    if (index > 3) return { error: "Нет свободного слота" };
-    if (!canPlaceWeapon(part, slots, parts, index)) return { error: "Нет свободного слота" };
-    if (slots[index]) return { error: "Нет свободного слота" };
-    const next = [...slots];
-    next[index] = partId;
-    return { slots: next };
-  }
-
-  const w = firstWeaponSlot(part, slots, parts);
-  if (w >= 0 && !slots[w]) {
-    const next = [...slots];
-    next[w] = partId;
-    return { slots: next };
-  }
-  const c = firstCommonSlot(slots);
-  if (c < 0) return { error: "Нет свободного слота" };
-  const next = [...slots];
-  next[c] = partId;
-  return { slots: next };
 }
 
 export function firstSlot(parts, slots, partId) {
