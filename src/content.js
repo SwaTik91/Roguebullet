@@ -108,13 +108,13 @@ export function cardPool(run) {
 export function defaultWep(id) {
   switch (id) {
     case "laser":
-      return { dmg: 28, cd: 0.72, width: 7, timer: 0 };
+      return { dmg: 28, cd: 0.72, width: 7, timer: 0, branch: null, rays: 1, spread: 0.28, bounces: 0, edgeMul: 1, burn: 0 };
     case "scatter":
       return { dmg: 9, cd: 1.05, n: 6, knock: 70, timer: 0 };
     case "grenade":
       return { dmg: 46, cd: 1.7, radius: 88, timer: 0 };
     case "emp":
-      return { dmg: 22, cd: 3.1, radius: 170, slow: 0.45, timer: 0 };
+      return { dmg: 22, cd: 3.1, radius: 170, slow: 0.45, slowMul: 0.45, slowDur: 1.15, hits: 1, knock: 0, timer: 0, branch: null };
     case "orb":
       return { dmg: 10, count: 2, radius: 92, spin: 1.8 };
     case "drone":

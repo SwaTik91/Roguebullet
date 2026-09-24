@@ -1,6 +1,8 @@
 import { defaultWep } from "./content.js";
 import { dronePool, droneStep } from "./drone.js";
+import { empStep } from "./emp.js";
 import { addCrit, gunPool, gunStep } from "./gun.js";
+import { laserStep } from "./laser.js";
 
 const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1, legendary: 1 };
 
@@ -122,26 +124,6 @@ function unlockCard(spec) {
 }
 
 const SIDE_LEGEND = {
-  laser: {
-    5: [
-      card("laser-l5a", "Прожиг", "Урон лазера ×2", "legendary", (r) => (r.wepStats.laser.dmg *= 2)),
-      card("laser-l5b", "Полотно", "Луч вдвое толще", "legendary", (r) => (r.wepStats.laser.width *= 2)),
-      card("laser-l5c", "Импульс луча", "Лазер бьёт вдвое чаще", "legendary", (r) => (r.wepStats.laser.cd *= 0.5)),
-    ],
-    10: [
-      card("laser-l10a", "Резак", "Урон лазера ×2", "legendary", (r) => (r.wepStats.laser.dmg *= 2)),
-      card("laser-l10b", "Завеса", "Луч ещё вдвое толще", "legendary", (r) => (r.wepStats.laser.width *= 2)),
-      card("laser-l10c", "Непрерывный", "Лазер бьёт ещё чаще", "legendary", (r) => (r.wepStats.laser.cd *= 0.6)),
-    ],
-    15: [
-      card("laser-l15a", "Сверхновый", "Урон лазера ×3", "legendary", (r) => (r.wepStats.laser.dmg *= 3)),
-      card("laser-l15b", "Горизонт", "Луч заполняет сектор", "legendary", (r) => (r.wepStats.laser.width += 18)),
-      card("laser-l15c", "Спектр", "Урон ×2 и луч чаще", "legendary", (r) => {
-        r.wepStats.laser.dmg *= 2;
-        r.wepStats.laser.cd *= 0.7;
-      }),
-    ],
-  },
   scatter: {
     5: [
       card("sc-l5a", "Шрапнель", "+6 дробинок", "legendary", (r) => (r.wepStats.scatter.n += 6)),
@@ -188,26 +170,6 @@ const SIDE_LEGEND = {
       card("gr-l15c", "Осадный", "Урон ×3", "legendary", (r) => (r.wepStats.grenade.dmg *= 3)),
     ],
   },
-  emp: {
-    5: [
-      card("emp-l5a", "Купол", "Радиус EMP ×2", "legendary", (r) => (r.wepStats.emp.radius *= 2)),
-      card("emp-l5b", "Разряд", "Урон EMP ×2", "legendary", (r) => (r.wepStats.emp.dmg *= 2)),
-      card("emp-l5c", "Ступор", "Замедление сильнее", "legendary", (r) => (r.wepStats.emp.slow += 0.25)),
-    ],
-    10: [
-      card("emp-l10a", "Полусфера", "Радиус ещё ×1.5", "legendary", (r) => (r.wepStats.emp.radius *= 1.5)),
-      card("emp-l10b", "Шторм", "Урон ×2", "legendary", (r) => (r.wepStats.emp.dmg *= 2)),
-      card("emp-l10c", "Частый пульс", "EMP срабатывает чаще", "legendary", (r) => (r.wepStats.emp.cd *= 0.6)),
-    ],
-    15: [
-      card("emp-l15a", "Тишина", "Радиус ×2 и сильнее замедление", "legendary", (r) => {
-        r.wepStats.emp.radius *= 2;
-        r.wepStats.emp.slow += 0.2;
-      }),
-      card("emp-l15b", "Перегрузка", "Урон ×3", "legendary", (r) => (r.wepStats.emp.dmg *= 3)),
-      card("emp-l15c", "Метроном", "EMP вдвое чаще", "legendary", (r) => (r.wepStats.emp.cd *= 0.5)),
-    ],
-  },
   orb: {
     5: [
       card("orb-l5a", "Кольцо", "+2 орбиты", "legendary", (r) => (r.wepStats.orb.count += 2)),
@@ -246,6 +208,16 @@ export function legendaryOffer(run, weaponKey) {
   if (weaponKey === "drone") {
     const level = run.drone?.branch ? next : 5;
     return tag(droneStep(level, run.drone?.branch).cards, "Дрон");
+  }
+  if (weaponKey === "laser") {
+    const laser = run.wepStats?.laser;
+    const level = laser?.branch ? next : 5;
+    return tag(laserStep(level, laser?.branch).cards, "Лазер");
+  }
+  if (weaponKey === "emp") {
+    const emp = run.wepStats?.emp;
+    const level = emp?.branch ? next : 5;
+    return tag(empStep(level, emp?.branch).cards, "Импульс");
   }
   const who = UNLOCKS.find((spec) => spec.id === weaponKey)?.title || weaponKey;
   return tag(SIDE_LEGEND[weaponKey]?.[next] || [], who);
