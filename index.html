@@ -80,6 +80,7 @@
           <div><span>Кристаллы</span><b id="menu-crystals">0</b></div>
         </div>
         <button class="btn primary" id="btn-play">В БОЙ</button>
+        <button class="btn" id="btn-coop">ВМЕСТЕ</button>
         <button class="btn" id="btn-hangar">АНГАР</button>
         <button class="btn" id="btn-shop">КРИСТАЛЛЫ</button>
         <button class="btn" id="btn-chest">СУНДУК</button>
@@ -94,6 +95,17 @@
         <p class="sub">Следующий открывается после предыдущего. Бой продолжается до третьего уровня.</p>
         <div class="upgrade-list" id="level-list"></div>
         <button class="btn" id="btn-levels-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-coop" class="screen hidden">
+        <h2>ВМЕСТЕ</h2>
+        <p class="sub">Один уровень на двоих. Пушки слева и справа, на одной линии.</p>
+        <p id="coop-wait" class="sub">Создай комнату и отправь код другу.</p>
+        <p id="coop-code" class="logo">----</p>
+        <button class="btn primary" id="btn-coop-host">СОЗДАТЬ</button>
+        <input id="coop-join-code" maxlength="4" placeholder="КОД ДРУГА" autocomplete="off" />
+        <button class="btn" id="btn-coop-join">ВОЙТИ</button>
+        <button class="btn" id="btn-coop-back">НАЗАД</button>
       </div>
 
       <div id="screen-hangar" class="screen hidden scroll">

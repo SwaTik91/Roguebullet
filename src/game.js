@@ -3,6 +3,7 @@ import { rayEnd, reflectAngle } from "./laser.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
+import { ensureSeats, nearestSeat } from "./coop.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const gatling = typeof Image === "undefined" ? null : new Image();
@@ -43,6 +44,8 @@ export class Game {
     this.speed = 1;
     this.state = "boot";
     this.queuedCard = options.queuedCard || null;
+    this.coop = null;
+    this.coopLock = false;
     if (this.headless) return;
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -62,11 +65,19 @@ export class Game {
     this.canvas.height = Math.floor(h * this.dpr);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
-    this.worldH = 1280;
-    this.worldW = 1280 * (w / h);
-    this.scale = h / this.worldH;
-    this.ox = 0;
-    this.oy = 0;
+    if (this.coopLock) {
+      this.worldW = 720;
+      this.worldH = 1280;
+      this.scale = Math.min(w / this.worldW, h / this.worldH);
+      this.ox = (w - this.worldW * this.scale) / 2;
+      this.oy = (h - this.worldH * this.scale) / 2;
+    } else {
+      this.worldH = 1280;
+      this.worldW = 1280 * (w / h);
+      this.scale = h / this.worldH;
+      this.ox = 0;
+      this.oy = 0;
+    }
     this.stars = Array.from({ length: 80 }, () => ({
       x: Math.random() * this.worldW,
       y: Math.random() * this.worldH,
@@ -302,6 +313,7 @@ export class Game {
       phase: Math.random() * Math.PI * 2,
       dead: false,
       fromSplit: !!fromSplit,
+      id: (this._eid = (this._eid || 0) + 1),
     });
   }
 
@@ -449,6 +461,10 @@ export class Game {
   }
 
   applyCard(card) {
+    if (this.coop) {
+      this.sendCoop({ t: "pick", id: card.id });
+      return;
+    }
     if (this.remote) {
       this.remoteAction = { action: "pick", cardId: card.id };
       return;
@@ -489,6 +505,12 @@ export class Game {
   }
 
   async rerollCards() {
+    if (this.coop) {
+      const result = await api.buyReroll(this.run.runId, this.run.offer?.level || 1);
+      if (result.profile) this.ui.applyProfile?.(result.profile);
+      this.sendCoop({ t: "reroll", used: result.used || 0 });
+      return;
+    }
     if (this.remote) {
       this.remoteAction = { action: "reroll" };
       return;
@@ -513,12 +535,13 @@ export class Game {
     }
   }
 
-  fireGun() {
+  fireGun(from) {
     const g = this.run.gun;
+    const origin = from || this.run.tower;
     const over = this.run.overdrive.left > 0;
     const dmg = g.dmg * (over ? this.run.overdrive.mul : 1);
     const shot = rollGunShot(g);
-    const a = g.angle;
+    const a = from?.angle ?? g.angle;
     const spd = (g.speed || 680) * (over ? 1.15 : 1);
     const gap = g.gap || 12;
     const sideX = -Math.sin(a);
@@ -526,8 +549,9 @@ export class Game {
     for (let i = 0; i < g.pellets; i++) {
       const off = (i - (g.pellets - 1) / 2) * gap;
       this.run.bullets.push({
-        x: this.run.tower.x + Math.cos(a) * 38 + sideX * off,
-        y: this.run.tower.y + Math.sin(a) * 38 + sideY * off,
+        x: origin.x + Math.cos(a) * 38 + sideX * off,
+        y: origin.y + Math.sin(a) * 38 + sideY * off,
+        id: (this._bid = (this._bid || 0) + 1),
         vx: Math.cos(a) * spd,
         vy: Math.sin(a) * spd,
         dmg,
@@ -1090,6 +1114,10 @@ export class Game {
   }
 
   continueLevel() {
+    if (this.coop) {
+      this.sendCoop({ t: "continue" });
+      return;
+    }
     if (this.remote) {
       this.remoteAction = { action: "continue" };
       return;
@@ -1118,6 +1146,10 @@ export class Game {
   }
 
   beginEndless() {
+    if (this.coop) {
+      this.sendCoop({ t: "endless" });
+      return;
+    }
     if (this.remote) {
       this.remoteAction = { action: "endless" };
       return;
@@ -1137,6 +1169,10 @@ export class Game {
   }
 
   exitAfterLevel() {
+    if (this.coop) {
+      this.sendCoop({ t: "exit" });
+      return;
+    }
     if (this.remote) {
       this.remoteAction = { action: "exit" };
       return;
@@ -1194,24 +1230,47 @@ export class Game {
     const r = this.run;
     const tw = r.tower;
 
-    tw.x = this.worldW / 2;
-    tw.y = this.worldH / 2;
-
-    const focused = this.pointer.down;
-    let targetAng = r.gun.angle;
-    if (focused) targetAng = angTo(tw, this.pointer);
+    if (r.seats) ensureSeats(r, this.worldW, this.worldH);
     else {
-      const nearest = this.nearest(tw);
-      if (nearest) targetAng = angTo(tw, nearest);
+      tw.x = this.worldW / 2;
+      tw.y = this.worldH / 2;
     }
-    const diff = normAng(targetAng - r.gun.angle);
-    const turn = focused ? 12 : Math.max(r.gun.autoTurn, 8);
-    r.gun.angle += clamp(diff, -turn * dt, turn * dt);
 
-    r.gun.cd -= dt;
-    if (r.gun.cd <= 0) {
-      this.fireGun();
-      r.gun.cd = 1 / r.gun.rate;
+    if (r.seats) {
+      for (const seat of r.seats) {
+        const focused = seat.pointer?.down;
+        let targetAng = seat.angle;
+        if (focused) targetAng = angTo(seat, seat.pointer);
+        else {
+          const nearest = this.nearest(seat);
+          if (nearest) targetAng = angTo(seat, nearest);
+        }
+        const diff = normAng(targetAng - seat.angle);
+        const turn = focused ? 12 : Math.max(r.gun.autoTurn, 8);
+        seat.angle += clamp(diff, -turn * dt, turn * dt);
+        seat.cd -= dt;
+        seat.hitCd = Math.max(0, seat.hitCd - dt);
+        if (seat.cd <= 0) {
+          this.fireGun(seat);
+          seat.cd = 1 / r.gun.rate;
+        }
+      }
+    } else {
+      const focused = this.pointer.down;
+      let targetAng = r.gun.angle;
+      if (focused) targetAng = angTo(tw, this.pointer);
+      else {
+        const nearest = this.nearest(tw);
+        if (nearest) targetAng = angTo(tw, nearest);
+      }
+      const diff = normAng(targetAng - r.gun.angle);
+      const turn = focused ? 12 : Math.max(r.gun.autoTurn, 8);
+      r.gun.angle += clamp(diff, -turn * dt, turn * dt);
+      r.gun.cd -= dt;
+      if (r.gun.cd <= 0) {
+        this.fireGun();
+        r.gun.cd = 1 / r.gun.rate;
+      }
     }
 
     if (r.overdrive.left > 0) r.overdrive.left -= dt;
@@ -1393,7 +1452,8 @@ export class Game {
 
     for (const e of r.enemies) {
       if (e.dead) continue;
-      const a = angTo(e, tw);
+      const home = r.seats ? nearestSeat(r.seats, e) : tw;
+      const a = angTo(e, home);
       let slow = 1;
       if (e.freeze > 0) {
         e.freeze -= dt;
@@ -1433,14 +1493,16 @@ export class Game {
         e.inEmp = false;
         if (emp?.prison) e.slow = Math.max(e.slow || 0, emp.prison);
       }
-      if (dist(e, tw) < e.r + tw.r && tw.hitCd <= 0) {
+      const hitCore = r.seats ? home : tw;
+      if (dist(e, hitCore) < e.r + (hitCore.r || tw.r) && (hitCore.hitCd || 0) <= 0 && tw.hitCd <= 0) {
         const orb = r.wepStats.orb;
         const blocked = tw.guard > 0 || (orb?.branch === "ward" && orb.guard > 0);
         if (blocked) {
           if (tw.guard > 0) tw.guard -= 1;
           else orb.guard -= 1;
           tw.hitCd = 0.35;
-          this.burst(tw.x, tw.y, "#34d399", 10);
+          hitCore.hitCd = 0.35;
+          this.burst(hitCore.x, hitCore.y, "#34d399", 10);
           if (orb?.reflect) this.damage(e, e.dmg * 3, "#34d399");
           if (orb?.flash) this.explode(tw.x, tw.y, orb.radius, orb.dmg * 6);
           if (orb?.mend) tw.hp = Math.min(tw.maxHp, tw.hp + orb.mend);
@@ -1448,8 +1510,9 @@ export class Game {
         }
         tw.hp -= e.dmg;
         tw.hitCd = e.boss ? 0.35 : 0.45;
+        hitCore.hitCd = tw.hitCd;
         this.shake = 7;
-        this.burst(tw.x, tw.y, "#ff5d7a", 8);
+        this.burst(hitCore.x, hitCore.y, "#ff5d7a", 8);
         if (!e.boss) {
           e.x -= Math.cos(a) * 36;
           e.y -= Math.sin(a) * 36;
@@ -1625,7 +1688,9 @@ export class Game {
       ctx.restore();
     }
 
-    this.drawTower(ctx);
+    if (this.run.seats?.length) {
+      for (const seat of this.run.seats) this.drawTower(ctx, seat);
+    } else this.drawTower(ctx);
     if (this.run.bossIntro > 0) this.drawBossIntro(ctx);
   }
 
@@ -1658,11 +1723,12 @@ export class Game {
     ctx.restore();
   }
 
-  drawTower(ctx) {
-    const tw = this.run.tower;
+  drawTower(ctx, seat) {
+    const tw = seat || this.run.tower;
+    const aimAngle = seat ? seat.angle : this.run.gun.angle;
     if (this.state === "play") {
-      const manual = this.pointer.down;
-      const aim = manual ? this.pointer : this.nearest(tw);
+      const manual = seat ? seat.pointer?.down : this.pointer.down;
+      const aim = manual ? (seat ? seat.pointer : this.pointer) : this.nearest(tw);
       if (aim) {
         ctx.strokeStyle = manual ? "rgba(255,255,255,0.4)" : "rgba(126,232,255,0.28)";
         ctx.setLineDash([5, 7]);
@@ -1678,7 +1744,7 @@ export class Game {
       const w = h * (gatling.naturalWidth / gatling.naturalHeight);
       ctx.save();
       ctx.translate(tw.x, tw.y);
-      ctx.rotate(this.run.gun.angle + Math.PI / 2);
+      ctx.rotate(aimAngle + Math.PI / 2);
       ctx.drawImage(gatling, -w / 2, -h * 0.78, w, h);
       ctx.restore();
     }
@@ -1777,7 +1843,105 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 
+  sendCoop(msg) {
+    const ws = this.coop?.ws;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  }
+
+  feedCoop(snap) {
+    if (!this.coop) return;
+    this.coop.snap = snap;
+    this.coopLock = true;
+    this.worldW = 720;
+    this.worldH = 1280;
+    if (!this.run) this.run = {};
+    this.state = snap.state;
+    this.presentCoop(1);
+    if (snap.state === "cards" && snap.cardKey !== this.cardKey) {
+      this.cardKey = snap.cardKey;
+      this.ui.showCards(snap.cards, snap.heading, 0);
+    }
+    if (snap.state === "play" && this.cardKey) {
+      this.cardKey = "";
+      this.ui.hideCards();
+    }
+    if (snap.state === "levelclear" && snap.levelClear && this._clearKey !== snap.wave) {
+      this._clearKey = snap.wave;
+      this.ui.showLevelClear(snap.levelClear);
+    }
+    if (snap.state === "result" && !this._resultShown) {
+      this._resultShown = true;
+      this.ui.showResult(!!snap.result?.won, this.run, snap.result?.granted || null, {});
+    }
+  }
+
+  presentCoop(gain) {
+    const snap = this.coop?.snap;
+    if (!snap) return;
+    const run = this.run || {};
+    const pull = (prev, next) => {
+      const map = new Map((prev || []).map((item) => [item.id, item]));
+      return next.map((item) => {
+        const old = map.get(item.id);
+        if (!old || gain >= 1) return { ...item };
+        return { ...item, x: old.x + (item.x - old.x) * gain, y: old.y + (item.y - old.y) * gain };
+      });
+    };
+    run.enemies = pull(run.enemies, snap.enemies);
+    run.bullets = pull(run.bullets, snap.bullets);
+    run.drones = pull(run.drones, snap.drones);
+    run.fx = [];
+    run.pools = [];
+    run.weapons = snap.weapons || {};
+    run.wepStats = run.wepStats || {};
+    run.pips = snap.pips || {};
+    run.wave = snap.wave;
+    run.chapter = snap.chapter;
+    run.level = snap.level;
+    run.coins = snap.coins;
+    run.crit = { chance: snap.crit || 0 };
+    run.overdrive = snap.overdrive;
+    run.tower = { ...(run.tower || {}), ...snap.tower, r: 34 };
+    run.runId = snap.runId;
+    run.offer = { level: snap.offerLevel || 1 };
+    run.bossIntro = 0;
+    run.gun = run.gun || { angle: -Math.PI / 2 };
+    const mine = this.coop.seat || 0;
+    run.seats = snap.seats.map((seat, i) => {
+      const prev = run.seats?.[i] || seat;
+      const local = i === mine;
+      const pointer = local ? this.pointer : null;
+      let angle = prev.angle ?? seat.angle;
+      if (local && pointer?.down && run.tower) {
+        angle = Math.atan2(pointer.y - seat.y, pointer.x - seat.x);
+      } else {
+        let delta = seat.angle - angle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        angle += delta * gain;
+      }
+      return { ...seat, r: 34, angle, pointer: local ? pointer : { down: false } };
+    });
+    this.run = run;
+    this.ui.setCore?.(run);
+    if (this._hudWave !== run.wave || this._hudCoins !== run.coins) {
+      this._hudWave = run.wave;
+      this._hudCoins = run.coins;
+      this.ui.updateHud?.(run);
+    }
+  }
+
   loop(t) {
+    if (this.coop?.snap) {
+      this.presentCoop(0.42);
+      if (t - (this.coop.sent || 0) > 50) {
+        this.coop.sent = t;
+        this.sendCoop({ t: "in", x: this.pointer.x, y: this.pointer.y, down: this.pointer.down });
+      }
+      this.draw(0);
+      requestAnimationFrame((n) => this.loop(n));
+      return;
+    }
     if (this.remote) {
       this.draw(0);
       const due = this.remoteAction || (this.state === "play" && t - (this.syncedAt || 0) > 80);

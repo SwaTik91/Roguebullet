@@ -153,6 +153,7 @@ const SCREENS = [
   "screen-login",
   "screen-menu",
   "screen-levels",
+  "screen-coop",
   "screen-hangar",
   "screen-shop",
   "screen-chest",
@@ -374,6 +375,45 @@ function beginBattle(level = 1) {
   Promise.resolve(game.startRun(level)).catch((error) => ui.toast(error.message || "Бой не запустился"));
 }
 
+function coopSocket(msg) {
+  const ws = new WebSocket(`ws://${location.hostname}:8090`);
+  ws.onopen = () => ws.send(JSON.stringify(msg));
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.t === "err") {
+      ui.toast(data.error || "Комната не найдена");
+      return;
+    }
+    if (data.t === "room") {
+      game.coop = { ws, seat: data.seat, snap: null };
+      $("coop-code").textContent = data.code;
+      $("coop-wait").textContent = data.seat === 0 ? "Ждём друга. Пусть введёт этот код." : "Входим в уровень…";
+    }
+    if (data.t === "snap") {
+      game.feedCoop(data);
+      if (game.state === "play") ui.showPlay();
+    }
+  };
+  ws.onerror = () => ui.toast("Нет связи с комнатой");
+}
+
+$("btn-coop").onclick = () => {
+  if (!api.token()) return;
+  openScreen("screen-coop");
+};
+$("btn-coop-back").onclick = () => showMenu();
+$("btn-coop-host").onclick = () => {
+  const level = profile?.clearedLevels?.length ? Math.min(3, profile.clearedLevels.length) : 1;
+  coopSocket({ t: "host", level: levelOpen(1) ? 1 : 1 });
+};
+$("btn-coop-join").onclick = () => {
+  const code = $("coop-join-code").value.trim().toUpperCase();
+  if (code.length < 4) {
+    ui.toast("Нужен код из 4 знаков");
+    return;
+  }
+  coopSocket({ t: "join", code });
+};
 $("btn-play").onclick = () => {
   if (!api.token()) return;
   openScreen("screen-levels");
