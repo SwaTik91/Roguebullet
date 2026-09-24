@@ -373,6 +373,32 @@ h2 {
   font-size: 14px;
 }
 
+#screen-how {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+#screen-how .how {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 72px;
+}
+
+#btn-how-back {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  width: min(280px, calc(100% - 48px));
+  margin-top: 0;
+  transform: translate(-50%, -50%);
+}
+
+#btn-how-back:active {
+  transform: translate(-50%, -50%) scale(0.98);
+}
+
 .how {
   width: min(460px, 100%);
   padding-left: 18px;
