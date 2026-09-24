@@ -124,6 +124,7 @@ export class Game {
       bossPulse: 0,
       overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85, chargeGain: 0 },
       offer: { level: 1, xp: 0, next: gunXpToNext(1) },
+      pips: {},
       endless: false,
       power: 1,
       levelCoins: 0,
@@ -414,6 +415,12 @@ export class Game {
 
   applyCard(card) {
     card.apply(this.run);
+    const owner = Object.entries(WEAPON_INFO).find(([, info]) => info.name === card.who);
+    if (owner) {
+      const key = owner[0];
+      this.run.pips[key] = this.run.pips[key] || [];
+      this.run.pips[key].push(card.rarity === "legendary" ? "legendary" : "normal");
+    }
     this.state = "play";
     this.ui.hideCards();
     this.ui.toast(card.title);

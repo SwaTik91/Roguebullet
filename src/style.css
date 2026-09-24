@@ -272,6 +272,27 @@ h2 {
   color: var(--cyan);
 }
 
+.pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+}
+
+.pips i.leg {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-shadow: 0 0 6px #ffb347;
+}
+
 .speed-btn {
   position: absolute;
   right: 12px;
