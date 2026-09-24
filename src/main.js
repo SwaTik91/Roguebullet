@@ -28,6 +28,7 @@ const ui = {
     $("hud-chapter").textContent = String(run.chapter);
     $("hud-coins").textContent = String(run.coins);
     $("hud-crit").textContent = `${Math.round((run.crit?.chance || 0) * 100)}%`;
+    this.setCore(run);
     const box = $("weapons");
     const names = Object.keys(run.weapons || {}).filter((k) => run.weapons[k]);
     const pips = run.pips || {};
@@ -36,6 +37,22 @@ const ui = {
       const dots = (pips[k] || []).map((kind) => `<i class="${kind === "legendary" ? "leg" : ""}" style="background:${kind === "legendary" ? "#ffb347" : info.color}"></i>`).join("");
       return `<div class="wep"><b style="color:${info.color}">${info.name}</b>${dots ? `<span class="pips">${dots}</span>` : ""}</div>`;
     }).join("");
+  },
+  setCore(run) {
+    const tower = run?.tower;
+    if (tower && $("hud-hp")) {
+      const hp = Math.max(0, Math.min(1, tower.hp / (tower.maxHp || 1)));
+      $("hud-hp").style.width = `${hp * 100}%`;
+      $("hud-hp").style.background = hp < 0.3 ? "#ff5d7a" : "#7ee8ff";
+    }
+    const drive = run?.overdrive;
+    if (drive && $("hud-drive")) {
+      const hot = drive.left > 0;
+      $("hud-drive-label").textContent = hot ? "ОВЕРДРАЙВ" : "ЗАРЯД";
+      const fill = hot ? drive.left / drive.dur : drive.charge / drive.max;
+      $("hud-drive").style.width = `${Math.max(0, Math.min(1, fill || 0)) * 100}%`;
+      $("core-status").classList.toggle("hot", hot);
+    }
   },
   setCombo(run) {
     const el = $("combo");

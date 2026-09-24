@@ -5,6 +5,8 @@ import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
+const gatling = typeof Image === "undefined" ? null : new Image();
+if (gatling) gatling.src = "/gatling.png";
 
 const LEVELS = 3;
 
@@ -1514,6 +1516,7 @@ export class Game {
     r.fx = r.fx.filter((f) => f.life > 0);
     r.comboFlash = Math.max(0, r.comboFlash - dt);
     this.shake = Math.max(0, this.shake - dt * 18);
+    this.ui.setCore?.(r);
     this.draw(dt);
   }
 
@@ -1657,70 +1660,6 @@ export class Game {
 
   drawTower(ctx) {
     const tw = this.run.tower;
-    const over = this.run.overdrive.left > 0;
-    const charge = this.run.overdrive.charge / this.run.overdrive.max;
-    ctx.save();
-    ctx.translate(tw.x, tw.y);
-    ctx.strokeStyle = over ? "#ffe08a" : "rgba(126,232,255,0.35)";
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, 48, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (over ? this.run.overdrive.left / this.run.overdrive.dur : charge));
-    ctx.stroke();
-
-    ctx.fillStyle = over ? "#ffe08a" : "#5ee7ff";
-    ctx.shadowColor = over ? "#ffe08a" : "#7ee8ff";
-    ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.arc(0, 0, 40, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#0c1824";
-    ctx.beginPath();
-    ctx.arc(0, 0, 24, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(this.run.gun.angle + Math.PI / 2);
-    ctx.fillStyle = "#163044";
-    ctx.beginPath();
-    ctx.arc(0, -6, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.save();
-    ctx.translate(0, -14);
-    const spin = ((typeof performance !== "undefined" ? performance.now() : Date.now()) / 120);
-    ctx.rotate(spin);
-    const barrel = over ? "#fff4c4" : "#e8fbff";
-    ctx.fillStyle = barrel;
-    ctx.strokeStyle = over ? "#c9a24a" : "#7ec8d8";
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI * 2 * i) / 6;
-      const bx = Math.cos(a) * 11;
-      const by = Math.sin(a) * 11;
-      ctx.beginPath();
-      ctx.rect(bx - 3.4, by - 42, 6.8, 46);
-      ctx.fill();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(bx, by - 42, 3.6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = over ? "#ffe08a" : "#7ee8ff";
-    ctx.beginPath();
-    ctx.arc(0, 0, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#0c1824";
-    ctx.beginPath();
-    ctx.arc(0, 0, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    ctx.restore();
-
-    const ratio = tw.hp / tw.maxHp;
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(tw.x - 46, tw.y + 46, 92, 8);
-    ctx.fillStyle = ratio < 0.3 ? "#ff5d7a" : "#7ee8ff";
-    ctx.fillRect(tw.x - 46, tw.y + 46, 92 * ratio, 8);
-
     if (this.state === "play") {
       const manual = this.pointer.down;
       const aim = manual ? this.pointer : this.nearest(tw);
@@ -1733,6 +1672,15 @@ export class Game {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+    if (gatling?.complete && gatling.naturalWidth) {
+      const h = 210;
+      const w = h * (gatling.naturalWidth / gatling.naturalHeight);
+      ctx.save();
+      ctx.translate(tw.x, tw.y);
+      ctx.rotate(this.run.gun.angle + Math.PI / 2);
+      ctx.drawImage(gatling, -w / 2, -h * 0.66, w, h);
+      ctx.restore();
     }
   }
 

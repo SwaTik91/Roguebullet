@@ -229,9 +229,50 @@ h2 {
   color: var(--amber);
 }
 
+.core-status {
+  margin: 8px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.core-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(8, 12, 22, 0.72);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.core-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #7ee8ff;
+}
+
+.core-bar.drive i {
+  background: #8fd4ff;
+}
+
+.core-status.hot .core-bar.drive i {
+  background: #ffe08a;
+}
+
+.core-bar span {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  line-height: 14px;
+  color: #f8fbff;
+}
+
 .combo {
   position: absolute;
-  top: 86px;
+  top: calc(132px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
@@ -449,9 +490,9 @@ h2 {
 
 .toast {
   position: absolute;
-  top: 46%;
+  top: calc(168px + env(safe-area-inset-top));
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 8;
   padding: 10px 16px;
   border-radius: 999px;
