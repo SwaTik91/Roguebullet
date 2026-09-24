@@ -1667,17 +1667,33 @@ export class Game {
     ctx.arc(0, 0, 48, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (over ? this.run.overdrive.left / this.run.overdrive.dur : charge));
     ctx.stroke();
 
+    ctx.fillStyle = over ? "#ffe08a" : "#7ee8ff";
+    ctx.beginPath();
+    ctx.arc(0, 0, tw.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#12202c";
+    ctx.beginPath();
+    ctx.arc(0, 0, tw.r * 0.58, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.rotate(this.run.gun.angle + Math.PI / 2);
     ctx.fillStyle = over ? "#fff4c4" : "#9cefff";
+    ctx.fillRect(-11, -18, 22, 16);
+    ctx.save();
+    ctx.translate(0, -20);
+    ctx.rotate(((typeof performance !== "undefined" ? performance.now() : Date.now()) / 70) % (Math.PI * 2));
+    ctx.fillStyle = over ? "#fff1b8" : "#e7fbff";
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI * 2 * i) / 6;
+      const bx = Math.cos(a) * 7;
+      const by = Math.sin(a) * 7;
+      ctx.fillRect(bx - 2.1, by - 24, 4.2, 28);
+    }
     ctx.beginPath();
-    ctx.moveTo(0, -46);
-    ctx.lineTo(8, -10);
-    ctx.lineTo(-8, -10);
+    ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-
-    hex(ctx, tw.x, tw.y, tw.r, over ? "#ffe08a" : "#7ee8ff", true);
-    hex(ctx, tw.x, tw.y, tw.r * 0.55, "#12202c", true);
+    ctx.restore();
 
     const ratio = tw.hp / tw.maxHp;
     ctx.fillStyle = "rgba(0,0,0,0.45)";
