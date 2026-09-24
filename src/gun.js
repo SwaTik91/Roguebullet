@@ -55,12 +55,13 @@ function volleyCards(level) {
       card("fan", "Веер", "+4 пули", (r) => {
         r.gun.pellets += 4;
       }),
-      card("pierce", "Пробой", "Пробивание +4", (r) => {
-        r.gun.pierce += 4;
+      card("pierce", "Пробой", "Пробивание +6 и урон +25%", (r) => {
+        r.gun.pierce += 6;
+        r.gun.dmg *= 1.25;
       }),
-      card("buck", "Картечь", "+2 пули и пробивание +3", (r) => {
+      card("buck", "Картечь", "+2 пули и пробивание +4", (r) => {
         r.gun.pellets += 2;
-        r.gun.pierce += 3;
+        r.gun.pierce += 4;
       }),
     ];
   }
@@ -72,9 +73,9 @@ function volleyCards(level) {
     card("through", "Насквозь", "Пуля не останавливается. Следующая цель получает 90% урона", (r) => {
       r.gun.falloff = 0.9;
     }),
-    card("curtain", "Завеса", "+3 пули и пробивание +2", (r) => {
+    card("curtain", "Завеса", "+3 пули и пробивание +4", (r) => {
       r.gun.pellets += 3;
-      r.gun.pierce += 2;
+      r.gun.pierce += 4;
     }),
   ];
 }
@@ -85,7 +86,7 @@ function ricochetCards(level) {
       card("carousel", "Карусель", "+3 отскока", (r) => {
         r.gun.bounces += 3;
       }),
-      card("edge", "Кромка", "После отскока урон пули ×2", (r) => {
+      card("edge", "Кромка", "После каждого отскока урон пули ×2", (r) => {
         r.gun.edgeMul = Math.max(r.gun.edgeMul || 1, 2);
       }),
       card("bank", "Двойной край", "+2 отскока и урон после отскока +50%", (r) => {
@@ -165,13 +166,13 @@ export function gunPool(branch) {
     ],
     volley: [
       at("pel1", "Веер", "+2 пули", "common", (r) => (r.gun.pellets += 2)),
-      at("prc1", "Пробой", "Пробивание +2", "common", (r) => (r.gun.pierce += 2)),
+      at("prc1", "Пробой", "Пробивание +4", "common", (r) => (r.gun.pierce += 4)),
       at("pel1b", "Шире", "+2 пули", "common", (r) => (r.gun.pellets += 2)),
       at("heavy-p", "Тяжёлая дробь", "Урон пули +40%", "common", (r) => (r.gun.dmg *= 1.4)),
       at("buck-r", "Картечь", "+3 пули", "rare", (r) => {
         r.gun.pellets += 3;
       }),
-      at("prc2", "Сквозной", "Пробивание +3", "rare", (r) => (r.gun.pierce += 3)),
+      at("prc2", "Сквозной", "Пробивание +5", "rare", (r) => (r.gun.pierce += 5)),
       at("salvo", "Залп+", "+2 пули и урон +40%", "rare", (r) => {
         r.gun.pellets += 2;
         r.gun.dmg *= 1.4;
@@ -180,10 +181,10 @@ export function gunPool(branch) {
         r.gun.pellets += 4;
         r.gun.gap = Math.max(6, r.gun.gap * 0.7);
       }),
-      at("drill", "Бур", "Пробивание +4", "epic", (r) => (r.gun.pierce += 4)),
-      at("cloud", "Облако", "+3 пули и пробивание +2", "epic", (r) => {
+      at("drill", "Бур", "Пробивание +7", "epic", (r) => (r.gun.pierce += 7)),
+      at("cloud", "Облако", "+3 пули и пробивание +4", "epic", (r) => {
         r.gun.pellets += 3;
-        r.gun.pierce += 2;
+        r.gun.pierce += 4;
       }),
     ],
     ricochet: [
@@ -246,15 +247,18 @@ export function gunStep(level, branch) {
           addRate(r.gun, 4);
           addCrit(r, 0.15);
         }),
-        card("volley", "Залп", "+3 пули в залпе и пробивание +2", (r) => {
+        card("volley", "Залп", "+3 пули, пробивание +6, урон +35%. Пули толще и живут дольше", (r) => {
           r.gun.branch = "volley";
           r.gun.pellets += 3;
-          r.gun.pierce += 2;
+          r.gun.pierce += 6;
+          r.gun.dmg *= 1.35;
+          r.gun.life += 0.45;
         }),
-        card("ricochet", "Рикошет", "Пули отскакивают 2 раза. Урон после отскока +25%", (r) => {
+        card("ricochet", "Рикошет", "4 отскока. Каждый отскок +45% урона, пуля дольше живёт и ищет цель", (r) => {
           r.gun.branch = "ricochet";
-          r.gun.bounces += 2;
-          r.gun.edgeMul = (r.gun.edgeMul || 1) * 1.25;
+          r.gun.bounces += 4;
+          r.gun.edgeMul = (r.gun.edgeMul || 1) * 1.45;
+          r.gun.life += 0.9;
         }),
       ],
     };
@@ -306,8 +310,12 @@ export function reflectBullet(b, worldW, worldH) {
     return { died: true };
   }
   b.bounces -= 1;
-  if (b.edgeMul && b.edgeMul !== 1 && !b.edged) {
-    b.dmg *= b.edgeMul;
+  if (b.edgeMul && b.edgeMul !== 1) {
+    if (b.baseDmg == null) b.baseDmg = b.dmg;
+    b.dmg = Math.min(b.dmg * b.edgeMul, b.baseDmg * 3);
+    b.edged = true;
+    b.color = "#fde68a";
+  } else {
     b.edged = true;
   }
   return { died: false, swarm: !!b.swarm };

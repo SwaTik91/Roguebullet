@@ -103,18 +103,21 @@ test("volley legendaries add pellets and pierce", () => {
   gunStep(10, "volley").cards[0].apply(r);
   gunStep(15, "volley").cards[0].apply(r);
   assert.equal(r.gun.pellets, 12);
+  assert.equal(r.gun.pierce, 6);
+  assert.ok(r.gun.dmg > 9);
   assert.ok(r.gun.gap < 12);
   const through = run();
   gunStep(15, "volley").cards[1].apply(through);
   assert.equal(through.gun.falloff, 0.9);
 });
 
-test("ricochet legendaries add bounces and a one-time edge bonus", () => {
+test("ricochet legendaries add bounces and stack edge damage", () => {
   const r = run();
   gunStep(5).cards[2].apply(r);
   gunStep(10, "ricochet").cards[0].apply(r);
   gunStep(15, "ricochet").cards[1].apply(r);
-  assert.equal(r.gun.bounces, 9);
+  assert.equal(r.gun.bounces, 11);
+  assert.ok(r.gun.life > 1.15);
   const swarm = gunPool("ricochet").find((c) => c.id === "spark-s");
   swarm.apply(r);
   assert.equal(rollGunOffer("ricochet", r.gun, 99).some((c) => c.id === "spark-s"), false);
@@ -128,7 +131,7 @@ test("ricochet legendaries add bounces and a one-time edge bonus", () => {
   b.x = 1;
   b.vx = -50;
   reflectBullet(b, 720, 1280);
-  assert.equal(b.dmg, 15);
+  assert.equal(b.dmg, 22.5);
 });
 
 test("falloff keeps the bullet and cuts damage", () => {

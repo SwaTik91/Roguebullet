@@ -506,7 +506,7 @@ export class Game {
         vx: Math.cos(a) * spd,
         vy: Math.sin(a) * spd,
         dmg,
-        r: over ? 5.5 : 3.2,
+        r: over ? 6.2 : g.bounces > 0 ? 4.6 : g.pierce > 0 ? 5.4 : 3.2,
         pierce: g.pierce,
         falloff: g.falloff || 0,
         canBounce: g.bounces > 0,
@@ -530,6 +530,32 @@ export class Game {
       this.ui.toast("ОВЕРДРАЙВ");
     }
     this.audio.shoot();
+  }
+
+  steerBounce(b, dt) {
+    let best = null;
+    let bestD = 460 * 460;
+    for (const e of this.run.enemies) {
+      if (e.dead || b.hit.has(e)) continue;
+      const dx = e.x - b.x;
+      const dy = e.y - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD) {
+        best = e;
+        bestD = d2;
+      }
+    }
+    if (!best) return;
+    const sp = Math.hypot(b.vx, b.vy) || 1;
+    const dx = best.x - b.x;
+    const dy = best.y - b.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const turn = Math.min(0.45, 2.6 * dt);
+    const nx = (b.vx / sp) * (1 - turn) + (dx / len) * turn;
+    const ny = (b.vy / sp) * (1 - turn) + (dy / len) * turn;
+    const nlen = Math.hypot(nx, ny) || 1;
+    b.vx = (nx / nlen) * sp;
+    b.vy = (ny / nlen) * sp;
   }
 
   spawnSwarm(b) {
@@ -577,7 +603,7 @@ export class Game {
     let last = { x, y };
     for (let hop = 0; hop <= bounces; hop++) {
       const end = rayEnd(x, y, a, this.worldW, this.worldH);
-      this.paintBeam(x, y, end.x, end.y, width, s.hold || 0.12, power);
+      this.paintBeam(x, y, end.x, end.y, width, Math.max(s.hold || 0, 0.12), power);
       const along = this.run.enemies
         .filter((e) => !e.dead && !seen.has(e) && pointLine(e.x, e.y, x, y, end.x, end.y) < width + e.r)
         .sort((p, q) => dist({ x, y }, p) - dist({ x, y }, q));
@@ -624,7 +650,7 @@ export class Game {
   }
 
   paintBeam(x1, y1, x2, y2, width, life, dps) {
-    const beam = { kind: "beam", x1, y1, x2, y2, life, color: "#60a5fa", w: width, dps, tick: 0 };
+    const beam = { kind: "beam", x1, y1, x2, y2, life: Math.max(life, 0.46), color: "#7dd3fc", w: width, dps, tick: 0 };
     this.run.fx.push(beam);
     if (life > 0.2) this.run.beams.push(beam);
   }
@@ -1231,10 +1257,11 @@ export class Game {
         const orbit = d.orbit ?? i * 1.2;
         const hover = t ? angTo(tw, t) + spread : orbit;
         const want = t
-          ? { x: t.x + Math.cos(hover) * 86, y: t.y + Math.sin(hover) * 86 }
-          : { x: tw.x + Math.cos(orbit) * 130, y: tw.y + Math.sin(orbit) * 130 };
-        d.x = lerp(d.x, want.x, 3.4 * dt);
-        d.y = lerp(d.y, want.y, 3.4 * dt);
+          ? { x: t.x + Math.cos(hover) * 110, y: t.y + Math.sin(hover) * 110 }
+          : { x: tw.x + Math.cos(orbit) * 150, y: tw.y + Math.sin(orbit) * 150 };
+        const glide = Math.min(0.08, 1.15 * dt);
+        d.x = lerp(d.x, want.x, glide);
+        d.y = lerp(d.y, want.y, glide);
         d.cd -= dt;
         if (t && d.cd <= 0) {
           const pellets = st.pellets || 1;
@@ -1262,7 +1289,7 @@ export class Game {
           d.cd = st.cd;
         }
       });
-      const min = 48;
+      const min = 78;
       for (let i = 0; i < r.drones.length; i++) {
         for (let j = i + 1; j < r.drones.length; j++) {
           const a = r.drones[i];
@@ -1405,6 +1432,7 @@ export class Game {
       b.life -= dt;
       const bounce = reflectBullet(b, this.worldW, this.worldH);
       if (bounce?.swarm && !bounce.died) this.spawnSwarm(b);
+      if (b.edged && b.life > 0 && b.kind === "gun") this.steerBounce(b, dt);
       if (b.kind === "nade" && (b.life < 0.05 || this.hitAny(b))) {
         this.blast(b);
         b.life = 0;
@@ -1537,12 +1565,24 @@ export class Game {
       ctx.globalAlpha = 1;
     }
     for (const d of this.run.drones) {
+      ctx.save();
+      ctx.translate(d.x, d.y);
       ctx.fillStyle = "#f472b6";
+      ctx.shadowColor = "#f472b6";
+      ctx.shadowBlur = 18;
       ctx.beginPath();
-      ctx.moveTo(d.x, d.y - 10);
-      ctx.lineTo(d.x + 8, d.y + 8);
-      ctx.lineTo(d.x - 8, d.y + 8);
+      ctx.moveTo(0, -26);
+      ctx.lineTo(20, 18);
+      ctx.lineTo(0, 8);
+      ctx.lineTo(-20, 18);
+      ctx.closePath();
       ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ffe4f1";
+      ctx.beginPath();
+      ctx.arc(0, -2, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     this.drawTower(ctx);
@@ -1693,14 +1733,25 @@ export class Game {
       ctx.textAlign = "center";
       ctx.fillText(f.text, f.x, f.y);
     } else if (f.kind === "beam") {
-      ctx.lineWidth = f.w;
-      ctx.shadowColor = f.color;
-      ctx.shadowBlur = 16;
+      const fade = clamp(f.life * 2.4, 0, 1);
+      ctx.lineCap = "round";
+      ctx.globalAlpha = fade * 0.45;
+      ctx.strokeStyle = "#93c5fd";
+      ctx.lineWidth = Math.max(18, (f.w || 8) * 3.6);
+      ctx.shadowColor = "#60a5fa";
+      ctx.shadowBlur = 28;
       ctx.beginPath();
       ctx.moveTo(f.x1, f.y1);
       ctx.lineTo(f.x2, f.y2);
       ctx.stroke();
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = "#f8fbff";
+      ctx.lineWidth = Math.max(5, (f.w || 8) * 0.9);
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 16;
+      ctx.stroke();
       ctx.shadowBlur = 0;
+      ctx.lineCap = "butt";
     }
     ctx.globalAlpha = 1;
   }

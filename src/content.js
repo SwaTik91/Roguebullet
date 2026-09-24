@@ -137,7 +137,7 @@ export function startingLoadout(profile = {}) {
 export function defaultWep(id) {
   switch (id) {
     case "laser":
-      return { dmg: 36, cd: 0.6, width: 9, timer: 0, branch: null, rays: 1, spread: 0.28, bounces: 0, edgeMul: 1, burn: 0 };
+      return { dmg: 36, cd: 0.6, width: 14, timer: 0, branch: null, rays: 1, spread: 0.28, bounces: 0, edgeMul: 1, burn: 0 };
     case "scatter":
       return { dmg: 16, cd: 0.8, n: 7, knock: 70, gap: 0.1, pierce: 0, timer: 0, branch: null, centerMul: 1, shards: 0, shardMul: 0.45 };
     case "grenade":
