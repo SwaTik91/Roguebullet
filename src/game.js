@@ -1,5 +1,6 @@
 import { SHAPES, WEAPON_INFO, enemyForWave, waveCount } from "./content.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
+import { droneStep } from "./drone.js";
 import { api, newId } from "./api.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
@@ -121,9 +122,27 @@ export class Game {
       bossIntro: 0,
       bossPulse: 0,
       overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85 },
-      weapons: { gun: true },
+      weapons: { gun: true, drone: true },
       wepStats: {},
       drones: [],
+      drone: {
+        dmg: 16,
+        count: 1,
+        cd: 0.26,
+        bombs: false,
+        radius: 64,
+        bombMul: 1.6,
+        speed: 560,
+        life: 0.9,
+        pierce: 0,
+        pellets: 1,
+        falloff: 0,
+        bombOnHit: false,
+        level: 1,
+        xp: 0,
+        next: gunXpToNext(1),
+        branch: null,
+      },
       orbAngle: 0,
       gun: {
         angle: -Math.PI / 2,
@@ -162,6 +181,7 @@ export class Game {
     };
     this.state = "play";
     this.ui.showPlay();
+    this.syncDrones();
     this.queueWave();
     this.ui.updateHud(this.run);
   }
@@ -328,6 +348,7 @@ export class Game {
     this.run.coins += e.coins;
     this.run.xp += e.xp;
     this.gainGunXp(1);
+    this.gainDroneXp(1);
     this.audio.hit();
     this.burst(e.x, e.y, e.color, e.boss ? 28 : 12);
     this.shake = Math.max(this.shake, e.boss ? 10 : 3);
@@ -371,11 +392,32 @@ export class Game {
       if (!step) break;
       if (step.kind === "choice") {
         this.state = "cards";
-        this.ui.showCards(step.cards, { title: `УРОВЕНЬ ${gun.level}`, sub: step.sub });
+        this.ui.showCards(step.cards, { title: `ПУЛЕМЁТ ${gun.level}`, sub: step.sub });
         break;
       }
       step.apply(this.run);
       this.ui.toast(`Ур. ${gun.level} · ${step.desc}`);
+    }
+  }
+
+  gainDroneXp(amount) {
+    const drone = this.run?.drone;
+    if (!drone || drone.level >= 15) return;
+    drone.xp += amount;
+    while (drone.level < 15 && drone.xp >= drone.next && this.state === "play") {
+      drone.xp -= drone.next;
+      drone.level += 1;
+      drone.next = gunXpToNext(drone.level);
+      const step = droneStep(drone.level, drone.branch);
+      if (!step) break;
+      if (step.kind === "choice") {
+        this.state = "cards";
+        this.ui.showCards(step.cards, { title: `ДРОН ${drone.level}`, sub: step.sub });
+        break;
+      }
+      step.apply(this.run);
+      this.syncDrones();
+      this.ui.toast(`Дрон ${drone.level} · ${step.desc}`);
     }
   }
 
@@ -395,11 +437,13 @@ export class Game {
     this.ui.toast(card.title);
     this.ui.updateHud(this.run);
     this.audio.pickup();
+    this.syncDrones();
     this.gainGunXp(0);
+    this.gainDroneXp(0);
   }
 
   syncDrones() {
-    const need = this.run.wepStats.drone?.count || 0;
+    const need = this.run.drone?.count || this.run.wepStats.drone?.count || 0;
     while (this.run.drones.length < need) {
       this.run.drones.push({
         x: this.run.tower.x,
@@ -697,9 +741,9 @@ export class Game {
       }
     }
 
-    if (r.weapons.drone && r.wepStats.drone) {
+    if (r.weapons.drone && r.drone) {
       this.syncDrones();
-      const st = r.wepStats.drone;
+      const st = r.drone;
       for (const d of r.drones) {
         const t = this.nearest(d);
         const want = t ? t : { x: tw.x, y: tw.y - 140 };
@@ -707,22 +751,28 @@ export class Game {
         d.y = lerp(d.y, want.y - 40, 1.8 * dt);
         d.cd -= dt;
         if (t && d.cd <= 0) {
+          const pellets = st.pellets || 1;
           const a = angTo(d, t);
-          r.bullets.push({
-            x: d.x,
-            y: d.y,
-            vx: Math.cos(a) * 560,
-            vy: Math.sin(a) * 560,
-            dmg: st.dmg,
-            r: 3,
-            life: 0.9,
-            color: "#f472b6",
-            kind: "gun",
-            hit: new Set(),
-          });
-          if (st.bombs) {
-            this.explode(d.x, d.y + 10, 46, st.dmg * 1.6);
+          for (let i = 0; i < pellets; i++) {
+            const ang = a + (i - (pellets - 1) / 2) * 0.12;
+            r.bullets.push({
+              x: d.x,
+              y: d.y,
+              vx: Math.cos(ang) * (st.speed || 560),
+              vy: Math.sin(ang) * (st.speed || 560),
+              dmg: st.dmg,
+              r: 3.4,
+              life: st.life || 0.9,
+              pierce: st.pierce || 0,
+              falloff: st.falloff || 0,
+              bombRadius: st.bombOnHit ? st.radius : 0,
+              bombDmg: st.bombOnHit ? st.dmg * st.bombMul : 0,
+              color: "#f472b6",
+              kind: "gun",
+              hit: new Set(),
+            });
           }
+          if (st.bombs && !st.bombOnHit) this.explode(d.x, d.y + 10, st.radius, st.dmg * st.bombMul);
           d.cd = st.cd;
         }
       }
@@ -816,6 +866,7 @@ export class Game {
           }
           b.hit.add(e);
           if (bulletShouldStop(b)) {
+            if (b.bombRadius) this.explode(b.x, b.y, b.bombRadius, b.bombDmg);
             b.life = 0;
             break;
           }
