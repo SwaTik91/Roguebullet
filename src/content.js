@@ -15,7 +15,7 @@ export const WEAPON_INFO = {
   laser: { name: "Лазер", color: "#60a5fa" },
   scatter: { name: "Дробь", color: "#fbbf24" },
   grenade: { name: "Заряд", color: "#fb7185" },
-  emp: { name: "Импульс", color: "#c084fc" },
+  emp: { name: "EMP", color: "#c084fc" },
   orb: { name: "Орбиты", color: "#34d399" },
   drone: { name: "Дрон", color: "#f472b6" },
 };
@@ -48,7 +48,7 @@ export function cardPool(run) {
     { id: "laser", title: "Лазер", desc: "Луч бьёт сквозь линию врагов", rarity: "rare", weapon: "laser" },
     { id: "scatter", title: "Дробь", desc: "Близкий конус, сильный отброс", rarity: "rare", weapon: "scatter" },
     { id: "grenade", title: "Заряд", desc: "АоЕ по скоплению", rarity: "rare", weapon: "grenade" },
-    { id: "emp", title: "Импульс", desc: "Пульс вокруг ядра, замедление", rarity: "epic", weapon: "emp" },
+    { id: "emp", title: "EMP", desc: "Пульс вокруг ядра, замедление", rarity: "epic", weapon: "emp" },
     { id: "orb", title: "Орбиты", desc: "Вращающиеся сферы-щиты", rarity: "rare", weapon: "orb" },
     { id: "drone", title: "Дрон", desc: "Автономный перехватчик", rarity: "epic", weapon: "drone" },
   ];

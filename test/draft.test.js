@@ -49,6 +49,16 @@ function lcg(seed) {
   };
 }
 
+test("EMP appears as often as the other unlocks", () => {
+  const seen = { laser: 0, scatter: 0, grenade: 0, emp: 0, orb: 0 };
+  const rng = lcg(7);
+  for (let i = 0; i < 200; i++) {
+    const card = rollBattleOffer(run(), 3, rng).find((c) => c.unlock);
+    if (card && seen[card.id] !== undefined) seen[card.id] += 1;
+  }
+  for (const count of Object.values(seen)) assert.ok(count > 20);
+});
+
 test("every offer includes a weapon other than the gun and the drone", () => {
   for (let i = 0; i < 40; i++) {
     const cards = rollBattleOffer(run(), 3, Math.random);

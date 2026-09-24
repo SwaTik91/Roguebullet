@@ -47,7 +47,7 @@ const UNLOCKS = [
   { id: "laser", title: "Лазер", desc: "Луч бьёт сквозь линию врагов", rarity: "rare" },
   { id: "scatter", title: "Дробь", desc: "Близкий конус, сильный отброс", rarity: "rare" },
   { id: "grenade", title: "Заряд", desc: "АоЕ по скоплению", rarity: "rare" },
-  { id: "emp", title: "Импульс", desc: "Пульс вокруг ядра, замедление", rarity: "epic" },
+  { id: "emp", title: "EMP", desc: "Пульс вокруг ядра, замедление", rarity: "epic" },
   { id: "orb", title: "Орбиты", desc: "Вращающиеся сферы-щиты", rarity: "rare" },
   { id: "drone", title: "Дрон", desc: "Автономный перехватчик", rarity: "epic" },
 ];
@@ -151,7 +151,7 @@ export function legendaryOffer(run, weaponKey) {
   if (weaponKey === "emp") {
     const emp = run.wepStats?.emp;
     const level = emp?.branch ? next : 5;
-    return tag(empStep(level, emp?.branch).cards, "Импульс");
+    return tag(empStep(level, emp?.branch).cards, "EMP");
   }
   if (weaponKey === "scatter") {
     const scatter = run.wepStats?.scatter;
@@ -196,6 +196,18 @@ export function battlePool(run) {
   return cards;
 }
 
+function pickFeatured(cards, rng) {
+  const groups = new Map();
+  for (const card of cards) {
+    const list = groups.get(card.who) || [];
+    list.push(card);
+    groups.set(card.who, list);
+  }
+  const names = [...groups.keys()];
+  const who = names[Math.floor(rng() * names.length)];
+  return pickWeighted(groups.get(who), rng);
+}
+
 function pickWeighted(cards, rng) {
   const sum = cards.reduce((acc, c) => acc + (RARITY_WEIGHT[c.rarity] || 1), 0);
   let roll = rng() * sum;
@@ -215,7 +227,7 @@ export function rollBattleOffer(run, n = 3, rng = Math.random) {
   const used = new Set();
   const featured = pool.filter((c) => !HOME.has(c.who));
   if (featured.length && n > 0) {
-    const picked = pickWeighted(featured, rng);
+    const picked = pickFeatured(featured, rng);
     used.add(picked.id);
     out.push(picked);
   }
