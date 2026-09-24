@@ -31,20 +31,24 @@ function queueCards(level) {
       card("kazn", "Казнь", "Критический урон ×3", (r) => {
         r.crit.mul = Math.max(3, r.crit.mul || 2);
       }),
-      card("edge-q", "Остриё", "Шанс крита +20%", (r) => addCrit(r, 0.2)),
-      card("drum", "Барабан", "+5 выстрелов в секунду", (r) => addRate(r.gun, 5)),
+      card("edge-q", "Остриё", "Шанс крита +28% и урон +30%", (r) => {
+        addCrit(r, 0.28);
+        r.gun.dmg *= 1.3;
+      }),
+      card("drum", "Барабан", "+8 выстрелов в секунду", (r) => addRate(r.gun, 8)),
     ];
   }
   return [
-    card("series", "Серия", "После крита следующий выстрел тоже критический", (r) => {
+    card("series", "Серия", "После крита следующий выстрел тоже критический, урон +25%", (r) => {
       r.gun.series = true;
+      r.gun.dmg *= 1.25;
     }),
-    card("counter", "Счётчик", "Каждый 4-й выстрел — гарантированный крит", (r) => {
-      r.gun.every = 4;
+    card("counter", "Счётчик", "Каждый 3-й выстрел — гарантированный крит", (r) => {
+      r.gun.every = 3;
     }),
-    card("burst", "Раскат", "+6 выстрелов в секунду и шанс крита +12%", (r) => {
-      addRate(r.gun, 6);
-      addCrit(r, 0.12);
+    card("burst", "Раскат", "+8 выстрелов в секунду и шанс крита +18%", (r) => {
+      addRate(r.gun, 8);
+      addCrit(r, 0.18);
     }),
   ];
 }
@@ -143,26 +147,26 @@ export function gunPool(branch) {
   ];
   const branches = {
     queue: [
-      at("spark", "Искра", "Шанс крита +8%", "common", (r) => addCrit(r, 0.08)),
-      at("rhythm", "Ритм", "+2 выстрела в секунду", "common", (r) => addRate(r.gun, 2)),
-      at("hone", "Заточка", "Шанс крита +8% и урон +25%", "common", (r) => {
-        addCrit(r, 0.08);
-        r.gun.dmg *= 1.25;
-      }),
-      at("cadence", "Каденция", "Шанс крита +8%", "common", (r) => addCrit(r, 0.08)),
-      at("sharp", "Острота", "Шанс крита +14%", "rare", (r) => addCrit(r, 0.14)),
-      at("drumlet", "Дробный темп", "+4 выстрела в секунду", "rare", (r) => addRate(r.gun, 4)),
-      at("keen", "Лезвие", "Критический урон +0.5", "rare", (r) => addCritMul(r, 0.5)),
-      at("sight", "Прицел", "Шанс крита +12% и урон +30%", "rare", (r) => {
+      at("spark", "Искра", "Шанс крита +12%", "common", (r) => addCrit(r, 0.12)),
+      at("rhythm", "Ритм", "+3 выстрела в секунду", "common", (r) => addRate(r.gun, 3)),
+      at("hone", "Заточка", "Шанс крита +12% и урон +35%", "common", (r) => {
         addCrit(r, 0.12);
-        r.gun.dmg *= 1.3;
+        r.gun.dmg *= 1.35;
       }),
-      at("reprisal", "Расправа", "Шанс крита +20%", "epic", (r) => addCrit(r, 0.2)),
-      at("stream", "Непрерывный", "+5 выстрелов в секунду и шанс крита +10%", "epic", (r) => {
-        addRate(r.gun, 5);
-        addCrit(r, 0.1);
+      at("cadence", "Каденция", "Шанс крита +12%", "common", (r) => addCrit(r, 0.12)),
+      at("sharp", "Острота", "Шанс крита +18%", "rare", (r) => addCrit(r, 0.18)),
+      at("drumlet", "Дробный темп", "+6 выстрелов в секунду", "rare", (r) => addRate(r.gun, 6)),
+      at("keen", "Лезвие", "Критический урон +0.75", "rare", (r) => addCritMul(r, 0.75)),
+      at("sight", "Прицел", "Шанс крита +16% и урон +45%", "rare", (r) => {
+        addCrit(r, 0.16);
+        r.gun.dmg *= 1.45;
       }),
-      at("cleave", "Рассечение", "Критический урон +1", "epic", (r) => addCritMul(r, 1)),
+      at("reprisal", "Расправа", "Шанс крита +25%", "epic", (r) => addCrit(r, 0.25)),
+      at("stream", "Непрерывный", "+7 выстрелов в секунду и шанс крита +15%", "epic", (r) => {
+        addRate(r.gun, 7);
+        addCrit(r, 0.15);
+      }),
+      at("cleave", "Рассечение", "Критический урон +1.25", "epic", (r) => addCritMul(r, 1.25)),
     ],
     volley: [
       at("pel1", "Веер", "+2 пули", "common", (r) => (r.gun.pellets += 2)),
@@ -242,10 +246,12 @@ export function gunStep(level, branch) {
       kind: "choice",
       sub: "Выбери ветку. До конца забега она не меняется.",
       cards: [
-        card("queue", "Очередь", "+4 выстрела в секунду и шанс крита +15%", (r) => {
+        card("queue", "Очередь", "+6 выстрелов в секунду, шанс крита +25%, крит сильнее и урон +25%", (r) => {
           r.gun.branch = "queue";
-          addRate(r.gun, 4);
-          addCrit(r, 0.15);
+          addRate(r.gun, 6);
+          addCrit(r, 0.25);
+          addCritMul(r, 0.5);
+          r.gun.dmg *= 1.25;
         }),
         card("volley", "Залп", "+3 пули, пробивание +6, урон +35%. Пули толще и живут дольше", (r) => {
           r.gun.branch = "volley";

@@ -147,8 +147,8 @@ test("branch cards and once-flags apply on the right weapon", () => {
   r.pips = { gun: Array(4).fill("normal"), drone: Array(4).fill("normal") };
   legendaryOffer(r, "gun").find((c) => c.id === "queue").apply(r);
   assert.equal(r.gun.branch, "queue");
-  assert.equal(r.gun.rate, 12);
-  assert.ok(Math.abs(r.crit.chance - 0.23) < 1e-9);
+  assert.equal(r.gun.rate, 14);
+  assert.ok(Math.abs(r.crit.chance - 0.33) < 1e-9);
   legendaryOffer(r, "drone").find((c) => c.id === "flock").apply(r);
   assert.equal(r.drone.branch, "flock");
   assert.equal(r.drone.count, 2);

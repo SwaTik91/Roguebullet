@@ -90,11 +90,20 @@ test("kazn sets crit damage to x3 and series chains one shot", () => {
   assert.equal(r.gun.forceNext, false);
 });
 
-test("counter crits every fourth shot", () => {
+test("counter crits every third shot", () => {
   const r = run();
   gunStep(15, "queue").cards[1].apply(r);
-  const flags = [1, 2, 3, 4].map(() => rollGunShot(r.gun).guaranteedCrit);
-  assert.deepEqual(flags, [false, false, false, true]);
+  const flags = [1, 2, 3].map(() => rollGunShot(r.gun).guaranteedCrit);
+  assert.deepEqual(flags, [false, false, true]);
+});
+
+test("queue branch raises rate, crit chance and crit damage", () => {
+  const r = run();
+  gunStep(5).cards[0].apply(r);
+  assert.equal(r.gun.rate, 14);
+  assert.equal(r.crit.chance, 0.33);
+  assert.equal(r.crit.mul, 2.5);
+  assert.ok(r.gun.dmg > 9);
 });
 
 test("volley legendaries add pellets and pierce", () => {
