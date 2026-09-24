@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Пушки PolySpire</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        background: #070b14;
+        color: #e8f4ff;
+        font-family: Manrope, system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0;
+        padding: 20px 16px 8px;
+        font-size: 22px;
+      }
+      p {
+        margin: 0;
+        padding: 0 16px 16px;
+        color: #9fb4c8;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding: 0 12px 28px;
+      }
+      @media (min-width: 720px) {
+        .grid { grid-template-columns: 1fr 1fr; }
+      }
+      figure {
+        margin: 0;
+        background: #101826;
+        border: 1px solid #243246;
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      figure.picked { border-color: #7ee8ff; }
+      img { width: 100%; display: block; background: #05060c; }
+      figcaption {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 12px 12px;
+        font-size: 15px;
+      }
+      b { color: #7ee8ff; }
+      .picked b { color: #ffe08a; }
+    </style>
+  </head>
+  <body>
+    <h1>Варианты пушки</h1>
+    <p>18-я уже стоит в игре. Остальные можно сравнить здесь.</p>
+    <div class="grid">
+      <figure><img src="00-gatling.png" alt="Гатлинг" /><figcaption><span>Гатлинг</span><b>был в игре</b></figcaption></figure>
+      <figure><img src="01-heavy.png" alt="1" /><figcaption><span>Тяжёлый ствол</span><b>1</b></figcaption></figure>
+      <figure><img src="02-twin.png" alt="2" /><figcaption><span>Спарка</span><b>2</b></figcaption></figure>
+      <figure><img src="03-energy.png" alt="3" /><figcaption><span>Энергопушка</span><b>3</b></figcaption></figure>
+      <figure><img src="04-box.png" alt="4" /><figcaption><span>Коробочный пулемёт</span><b>4</b></figcaption></figure>
+      <figure><img src="05-rail.png" alt="5" /><figcaption><span>Рельса</span><b>5</b></figcaption></figure>
+      <figure><img src="06-flak.png" alt="6" /><figcaption><span>Зенитка</span><b>6</b></figcaption></figure>
+      <figure><img src="07-howitzer.png" alt="7" /><figcaption><span>Гаубица</span><b>7</b></figcaption></figure>
+      <figure><img src="08-cross.png" alt="8" /><figcaption><span>Крест</span><b>8</b></figcaption></figure>
+      <figure><img src="09-simple-cannon.png" alt="9" /><figcaption><span>Простой ствол</span><b>9</b></figcaption></figure>
+      <figure><img src="10-simple-twin.png" alt="10" /><figcaption><span>Два ствола</span><b>10</b></figcaption></figure>
+      <figure><img src="11-triangle.png" alt="11" /><figcaption><span>Треугольник</span><b>11</b></figcaption></figure>
+      <figure><img src="12-fan.png" alt="12" /><figcaption><span>Веер</span><b>12</b></figcaption></figure>
+      <figure><img src="13-mid-cannon.png" alt="13" /><figcaption><span>Ствол с дулом</span><b>13</b></figcaption></figure>
+      <figure><img src="14-mid-twin.png" alt="14" /><figcaption><span>Спарка</span><b>14</b></figcaption></figure>
+      <figure><img src="15-mid-quad.png" alt="15" /><figcaption><span>Четыре ствола</span><b>15</b></figcaption></figure>
+      <figure><img src="16-mid-taper.png" alt="16" /><figcaption><span>Конус</span><b>16</b></figcaption></figure>
+      <figure><img src="17-cannon.png" alt="17" /><figcaption><span>Стильный ствол</span><b>17</b></figcaption></figure>
+      <figure class="picked"><img src="18-twin.png" alt="18" /><figcaption><span>Спарка</span><b>18 · в игре</b></figcaption></figure>
+      <figure><img src="19-rotary.png" alt="19" /><figcaption><span>Ротор</span><b>19</b></figcaption></figure>
+      <figure><img src="20-needle.png" alt="20" /><figcaption><span>Игла</span><b>20</b></figcaption></figure>
+    </div>
+  </body>
+</html>

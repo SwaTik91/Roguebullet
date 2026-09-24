@@ -1679,7 +1679,7 @@ export class Game {
       ctx.save();
       ctx.translate(tw.x, tw.y);
       ctx.rotate(this.run.gun.angle + Math.PI / 2);
-      ctx.drawImage(gatling, -w / 2, -h * 0.66, w, h);
+      ctx.drawImage(gatling, -w / 2, -h * 0.78, w, h);
       ctx.restore();
     }
   }
