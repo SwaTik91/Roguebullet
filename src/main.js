@@ -27,13 +27,14 @@ const ui = {
     $("hud-coins").textContent = String(run.coins);
     $("hud-crit").textContent = `${Math.round((run.crit?.chance || 0) * 100)}%`;
     const box = $("weapons");
-    box.innerHTML = Object.keys(run.weapons)
-      .filter((k) => run.weapons[k])
-      .map((k) => {
-        const info = WEAPON_INFO[k];
-        return `<div class="wep"><b style="color:${info.color}">${info.name}</b>активно</div>`;
-      })
-      .join("");
+    const gun = run.gun;
+    if (gun?.level) {
+      const branch = gun.branch === "queue" ? "Очередь" : gun.branch === "volley" ? "Залп" : gun.branch === "ricochet" ? "Рикошет" : "ветка на 5 ур.";
+      const progress = gun.level >= 15 ? "макс" : `${gun.xp}/${gun.next}`;
+      box.innerHTML = `<div class="wep"><b style="color:${WEAPON_INFO.gun.color}">Пулемёт ${gun.level}/15</b>${branch} · ${progress}</div>`;
+    } else {
+      box.innerHTML = "";
+    }
   },
   setCombo(run) {
     const el = $("combo");
@@ -45,13 +46,17 @@ const ui = {
     el.classList.remove("hidden");
     $("combo-text").textContent = `${names[run.comboType] || "●"} × ${run.combo}`;
   },
-  showCards(cards) {
+  showCards(cards, heading) {
     $("screen-cards").classList.remove("hidden");
+    if (heading) {
+      $("cards-title").textContent = heading.title;
+      $("cards-sub").textContent = heading.sub;
+    }
     $("card-row").innerHTML = "";
     cards.forEach((card) => {
       const btn = document.createElement("button");
       btn.className = `card ${card.rarity}`;
-      btn.innerHTML = `<small>${card.rarity === "epic" ? "ЭПИК" : card.rarity === "rare" ? "РЕДКАЯ" : "ОБЫЧНАЯ"}</small><strong>${card.title}</strong><p>${card.desc}</p>`;
+      btn.innerHTML = `<small>${card.rarity === "epic" ? "ЛЕГЕНДАРКА" : card.rarity === "rare" ? "РЕДКАЯ" : "ОБЫЧНАЯ"}</small><strong>${card.title}</strong><p>${card.desc}</p>`;
       btn.onclick = () => game.applyCard(card);
       $("card-row").appendChild(btn);
     });

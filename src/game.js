@@ -1,17 +1,8 @@
-import { SHAPES, WEAPON_INFO, pickCards, enemyForWave, waveCount, defaultWep } from "./content.js";
+import { SHAPES, WEAPON_INFO, enemyForWave, waveCount } from "./content.js";
+import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
 import { api, newId } from "./api.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
-const CHEST_CARDS = {
-  Калибр: (r) => (r.gun.dmg *= 1.35),
-  Темп: (r) => (r.gun.rate *= 1.25),
-  Сервопривод: (r) => (r.gun.autoTurn *= 1.45),
-  Пластины: (r) => {
-    r.tower.maxHp += 80;
-    r.tower.hp += 80;
-    r.tower.regen += 1.2;
-  },
-};
 
 const LEVELS = 3;
 
@@ -140,10 +131,22 @@ export class Game {
         rate: 8,
         pellets: 1,
         pierce: 0,
-        bounce: false,
-        killStack: 0,
+        bounces: 0,
+        life: 1.15,
+        speed: 680,
+        gap: 12,
+        edgeMul: 1,
+        swarm: false,
+        falloff: 0,
+        series: false,
+        every: 0,
+        shot: 0,
+        forceNext: false,
+        level: 1,
+        xp: 0,
+        next: gunXpToNext(1),
+        branch: null,
         autoTurn: 2.6,
-        focusMul: 1.65,
         cd: 0,
       },
       crit: { chance: 0.08 + (profile.critBonus || 0) / 100, mul: 2 },
@@ -157,26 +160,8 @@ export class Game {
       won: false,
       usedCard: false,
     };
-    for (const id of profile.weapons || []) {
-      this.run.weapons[id] = true;
-      this.run.wepStats[id] = defaultWep(id);
-    }
-    if (this.run.weapons.drone) this.syncDrones();
     this.state = "play";
     this.ui.showPlay();
-    let cardName = null;
-    try {
-      const taken = await api.takeCard(this.run.runId);
-      cardName = taken?.card || null;
-      if (taken?.profile) this.ui.applyProfile?.(taken.profile);
-    } catch {
-      cardName = (profile.cardQueue || [])[0] || null;
-    }
-    const applyCard = CHEST_CARDS[cardName];
-    if (applyCard) {
-      applyCard(this.run);
-      this.run.usedCard = true;
-    }
     this.queueWave();
     this.ui.updateHud(this.run);
   }
@@ -289,10 +274,10 @@ export class Game {
     return best;
   }
 
-  damage(e, amt, src, canCrit = true) {
-    if (e.dead) return;
+  damage(e, amt, src, canCrit = true, forcedCrit = false) {
+    if (e.dead) return false;
     let crit = false;
-    if (canCrit && this.run.crit && Math.random() < this.run.crit.chance) {
+    if (canCrit && this.run.crit && (forcedCrit || Math.random() < this.run.crit.chance)) {
       amt *= this.run.crit.mul;
       crit = true;
     }
@@ -303,7 +288,7 @@ export class Game {
     }
     if (amt <= 0) {
       this.spark(e.x, e.y, "#34d399", 4);
-      return;
+      return crit;
     }
     const dealt = amt;
     e.hp -= dealt;
@@ -316,6 +301,7 @@ export class Game {
       this.floatDamage(e.x, e.y, dealt, false);
     }
     if (e.hp <= 0) this.kill(e);
+    return crit;
   }
 
   floatDamage(x, y, amount, crit) {
@@ -341,7 +327,7 @@ export class Game {
     else this.run.kills[bucket] += 1;
     this.run.coins += e.coins;
     this.run.xp += e.xp;
-    this.run.gun.dmg *= 1 + this.run.gun.killStack;
+    this.gainGunXp(1);
     this.audio.hit();
     this.burst(e.x, e.y, e.color, e.boss ? 28 : 12);
     this.shake = Math.max(this.shake, e.boss ? 10 : 3);
@@ -370,12 +356,27 @@ export class Game {
       this.ui.toast("РЕЗОНАНС ФОРМ");
     }
 
-    if (this.run.xp >= this.run.nextXp && this.state === "play") {
-      this.run.xp -= this.run.nextXp;
-      this.run.nextXp = Math.round(this.run.nextXp * 1.28 + 6);
-      this.offerCards();
-    }
     this.ui.updateHud(this.run);
+  }
+
+  gainGunXp(amount) {
+    const gun = this.run?.gun;
+    if (!gun || gun.level >= 15) return;
+    gun.xp += amount;
+    while (gun.level < 15 && gun.xp >= gun.next && this.state === "play") {
+      gun.xp -= gun.next;
+      gun.level += 1;
+      gun.next = gunXpToNext(gun.level);
+      const step = gunStep(gun.level, gun.branch);
+      if (!step) break;
+      if (step.kind === "choice") {
+        this.state = "cards";
+        this.ui.showCards(step.cards, { title: `УРОВЕНЬ ${gun.level}`, sub: step.sub });
+        break;
+      }
+      step.apply(this.run);
+      this.ui.toast(`Ур. ${gun.level} · ${step.desc}`);
+    }
   }
 
   prismBurst(x, y) {
@@ -387,19 +388,14 @@ export class Game {
     this.shake = 8;
   }
 
-  offerCards() {
-    this.state = "cards";
-    const count = this.profile?.fourthCard ? 4 : 3;
-    this.ui.showCards(pickCards(this.run, count));
-  }
-
   applyCard(card) {
     card.apply(this.run);
-    if (card.weapon === "drone") this.syncDrones();
     this.state = "play";
     this.ui.hideCards();
+    this.ui.toast(card.title);
     this.ui.updateHud(this.run);
     this.audio.pickup();
+    this.gainGunXp(0);
   }
 
   syncDrones() {
@@ -417,11 +413,11 @@ export class Game {
   fireGun() {
     const g = this.run.gun;
     const over = this.run.overdrive.left > 0;
-    const focused = this.pointer.down;
-    const dmg = g.dmg * (focused ? g.focusMul : 1) * (over ? this.run.overdrive.mul : 1);
+    const dmg = g.dmg * (over ? this.run.overdrive.mul : 1);
+    const shot = rollGunShot(g);
     const a = g.angle;
-    const spd = over ? 780 : 680;
-    const gap = 12;
+    const spd = (g.speed || 680) * (over ? 1.15 : 1);
+    const gap = g.gap || 12;
     const sideX = -Math.sin(a);
     const sideY = Math.cos(a);
     for (let i = 0; i < g.pellets; i++) {
@@ -434,14 +430,20 @@ export class Game {
         dmg,
         r: over ? 5.5 : 3.2,
         pierce: g.pierce,
-        bounce: g.bounce,
-        life: 1.15,
+        falloff: g.falloff || 0,
+        canBounce: g.bounces > 0,
+        bounces: g.bounces,
+        edgeMul: g.edgeMul || 1,
+        swarm: !!g.swarm,
+        guaranteedCrit: shot.guaranteedCrit,
+        canChain: shot.canChain,
+        life: g.life || 1.15,
         color: over ? "#fff1b8" : "#7ee8ff",
         kind: "gun",
         hit: new Set(),
       });
     }
-    const gain = (this.pointer.down ? 3.4 : 1.6) * (1 + this.meta.charge * 0.18);
+    const gain = 1.6 * (1 + this.meta.charge * 0.18);
     if (this.run.overdrive.left <= 0) this.run.overdrive.charge += gain;
     if (this.run.overdrive.charge >= this.run.overdrive.max) {
       this.run.overdrive.charge = 0;
@@ -450,6 +452,29 @@ export class Game {
       this.ui.toast("ОВЕРДРАЙВ");
     }
     this.audio.shoot();
+  }
+
+  spawnSwarm(b) {
+    const sp = Math.hypot(b.vx, b.vy) || 1;
+    const nx = -b.vy / sp;
+    const ny = b.vx / sp;
+    const sign = b.swarmSide || 1;
+    b.swarmSide = -sign;
+    this.run.bullets.push({
+      x: b.x + nx * sign * 12,
+      y: b.y + ny * sign * 12,
+      vx: nx * sign * 480,
+      vy: ny * sign * 480,
+      dmg: b.dmg * 0.5,
+      r: 3,
+      pierce: 0,
+      falloff: 0,
+      canBounce: false,
+      life: 0.35,
+      color: "#d7f7ff",
+      kind: "gun",
+      hit: new Set(),
+    });
   }
 
   fireLaser() {
@@ -772,10 +797,8 @@ export class Game {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
-      if (b.bounce) {
-        if (b.x < 8 || b.x > this.worldW - 8) b.vx *= -1;
-        if (b.y < 8 || b.y > this.worldH - 8) b.vy *= -1;
-      }
+      const bounce = reflectBullet(b, this.worldW, this.worldH);
+      if (bounce?.swarm && !bounce.died) this.spawnSwarm(b);
       if (b.kind === "nade" && (b.life < 0.05 || this.hitAny(b))) {
         this.explode(b.x, b.y, b.radius, b.dmg);
         b.life = 0;
@@ -784,19 +807,15 @@ export class Game {
       for (const e of r.enemies) {
         if (e.dead || b.hit.has(e)) continue;
         if (dist(b, e) < b.r + e.r) {
-          this.damage(e, b.dmg, b.color);
+          const crit = this.damage(e, b.dmg, b.color, true, !!b.guaranteedCrit);
+          if (crit && b.canChain) r.gun.forceNext = true;
           if (b.knock) {
             const a = angTo(tw, e);
             e.x += Math.cos(a) * b.knock * 0.12;
             e.y += Math.sin(a) * b.knock * 0.12;
           }
           b.hit.add(e);
-          if (!b.pierce) {
-            b.life = 0;
-            break;
-          }
-          b.pierce -= 1;
-          if (b.pierce < 0) {
+          if (bulletShouldStop(b)) {
             b.life = 0;
             break;
           }
