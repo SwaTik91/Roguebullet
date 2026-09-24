@@ -271,9 +271,10 @@ function renderParts() {
 
   $("parts-slots").innerHTML = loadout
     .map((id, index) => {
-      const part = id ? byId.get(id) : null;
-      const filled = Boolean(part);
-      return `<button type="button" class="part-slot${filled ? "" : " empty"}" data-slot="${index}" ${filled ? "" : "disabled"}>${filled ? partBlock(part) : '<span class="sub">Пусто</span>'}</button>`;
+      const occupied = Boolean(id);
+      const part = occupied ? byId.get(id) : null;
+      const label = !occupied ? '<span class="sub">Пусто</span>' : part ? partBlock(part) : '<span class="sub">Занято</span>';
+      return `<button type="button" class="part-slot${occupied ? "" : " empty"}" data-slot="${index}" ${occupied ? "" : "disabled"}>${label}</button>`;
     })
     .join("");
 
