@@ -1674,7 +1674,7 @@ export class Game {
       }
     }
     if (gatling?.complete && gatling.naturalWidth) {
-      const h = 210;
+      const h = 128;
       const w = h * (gatling.naturalWidth / gatling.naturalHeight);
       ctx.save();
       ctx.translate(tw.x, tw.y);
