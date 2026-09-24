@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addRate, bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "../src/gun.js";
+import { addRate, bulletShouldStop, gunPool, gunStep, gunXpToNext, reflectBullet, rollGunOffer, rollGunShot } from "../src/gun.js";
 
 function run() {
   return {
@@ -25,13 +25,34 @@ function run() {
   };
 }
 
-test("shared levels raise damage and rate before the branch", () => {
-  const r = run();
-  gunStep(2).apply(r);
-  gunStep(3).apply(r);
-  gunStep(4).apply(r);
-  assert.equal(r.gun.dmg, 9 * 1.25 * 1.25);
-  assert.equal(r.gun.rate, 9);
+test("ordinary levels offer three cards from a large rarity pool", () => {
+  const shared = gunPool(null);
+  const queue = gunPool("queue");
+  assert.ok(shared.length >= 16);
+  assert.ok(queue.length > shared.length);
+  for (const rarity of ["common", "rare", "epic"]) {
+    assert.ok(shared.some((c) => c.rarity === rarity));
+    assert.ok(queue.some((c) => c.rarity === rarity));
+  }
+  assert.equal(queue.some((c) => c.id === "pel1"), false);
+  const step = gunStep(2);
+  assert.equal(step.cards.length, 3);
+  assert.equal(new Set(step.cards.map((c) => c.id)).size, 3);
+  for (const level of [10, 15]) assert.equal(gunStep(level, "queue").cards.length, 3);
+});
+
+test("common cards appear more often than epics", () => {
+  let seed = 7;
+  const rng = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const counts = { common: 0, rare: 0, epic: 0 };
+  for (let i = 0; i < 200; i++) {
+    for (const card of rollGunOffer("queue", {}, 3, rng)) counts[card.rarity] += 1;
+  }
+  assert.ok(counts.common > counts.rare);
+  assert.ok(counts.rare > counts.epic);
 });
 
 test("level 5 offers the three branches", () => {
@@ -40,18 +61,16 @@ test("level 5 offers the three branches", () => {
   assert.deepEqual(step.cards.map((c) => c.title), ["Очередь", "Залп", "Рикошет"]);
 });
 
-test("queue branch raises rate and crit and caps both", () => {
+test("rate and crit caps still hold", () => {
   const r = run();
-  gunStep(5).cards[0].apply(r);
-  for (const level of [6, 7, 8, 9, 11, 12, 13, 14]) gunStep(level, "queue").apply(r);
-  gunStep(10, "queue").cards[1].apply(r);
-  assert.equal(r.gun.rate, 16);
-  assert.ok(Math.abs(r.crit.chance - (0.08 + 0.1 + 0.06 * 3)) < 1e-9);
+  const tempo = gunPool(null).find((c) => c.id === "tempo");
+  const spark = gunPool("queue").find((c) => c.id === "spark");
   r.gun.rate = 17;
   addRate(r.gun, 5);
+  tempo.apply(r);
   assert.equal(r.gun.rate, 18);
   r.crit.chance = 0.74;
-  gunStep(7, "queue").apply(r);
+  spark.apply(r);
   assert.equal(r.crit.chance, 0.75);
 });
 
@@ -79,30 +98,27 @@ test("counter crits every fourth shot", () => {
   assert.deepEqual(flags, [false, false, false, true]);
 });
 
-test("volley grows pellets and pierce, wall tightens the gap", () => {
+test("volley legendaries add pellets and pierce", () => {
   const r = run();
   gunStep(5).cards[1].apply(r);
-  for (const level of [6, 7, 8, 9, 11, 12, 13, 14]) gunStep(level, "volley").apply(r);
-  assert.equal(r.gun.pellets, 6);
-  assert.equal(r.gun.pierce, 3);
   gunStep(10, "volley").cards[0].apply(r);
   gunStep(15, "volley").cards[0].apply(r);
-  assert.equal(r.gun.pellets, 11);
+  assert.equal(r.gun.pellets, 8);
   assert.ok(r.gun.gap < 12);
   const through = run();
   gunStep(15, "volley").cards[1].apply(through);
   assert.equal(through.gun.falloff, 0.75);
 });
 
-test("ricochet bounce count and one-time edge bonus", () => {
+test("ricochet legendaries add bounces and a one-time edge bonus", () => {
   const r = run();
   gunStep(5).cards[2].apply(r);
-  for (const level of [6, 7, 8, 9, 11, 12, 13, 14]) gunStep(level, "ricochet").apply(r);
   gunStep(10, "ricochet").cards[0].apply(r);
   gunStep(15, "ricochet").cards[1].apply(r);
-  assert.equal(r.gun.bounces, 8);
-  assert.ok(Math.abs(r.gun.life - 1.85) < 1e-9);
-  assert.equal(r.gun.speed, 840);
+  assert.equal(r.gun.bounces, 6);
+  const swarm = gunPool("ricochet").find((c) => c.id === "spark-s");
+  swarm.apply(r);
+  assert.equal(rollGunOffer("ricochet", r.gun, 99).some((c) => c.id === "spark-s"), false);
   const edge = run();
   edge.gun.bounces = 2;
   edge.gun.edgeMul = 1.5;

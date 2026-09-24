@@ -15,16 +15,23 @@ export function addCrit(run, amount) {
   run.crit.chance = Math.min(GUN_CRIT_CAP, run.crit.chance + amount);
 }
 
-function card(id, title, desc, apply) {
-  return { id, title, desc, rarity: "epic", apply };
+function card(id, title, desc, apply, rarity = "legendary") {
+  return { id, title, desc, rarity, apply };
+}
+
+const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1 };
+
+function addCritMul(run, amount) {
+  run.crit.mul = Math.min(4, (run.crit.mul || 2) + amount);
 }
 
 function queueCards(level) {
   if (level === 10) {
     return [
       card("kazn", "Казнь", "Критический урон ×3", (r) => {
-        r.crit.mul = 3;
+        r.crit.mul = Math.max(3, r.crit.mul || 2);
       }),
+      card("edge-q", "Остриё", "Шанс крита +15%", (r) => addCrit(r, 0.15)),
       card("drum", "Барабан", "+3 выстрела в секунду, урон пули −10%", (r) => {
         addRate(r.gun, 3);
         r.gun.dmg *= 0.9;
@@ -37,6 +44,10 @@ function queueCards(level) {
     }),
     card("counter", "Счётчик", "Каждый 4-й выстрел — гарантированный крит", (r) => {
       r.gun.every = 4;
+    }),
+    card("burst", "Раскат", "+4 выстрела в секунду и шанс крита +8%", (r) => {
+      addRate(r.gun, 4);
+      addCrit(r, 0.08);
     }),
   ];
 }
@@ -51,6 +62,10 @@ function volleyCards(level) {
       card("pierce", "Пробой", "Пробивание +3", (r) => {
         r.gun.pierce += 3;
       }),
+      card("buck", "Картечь", "+1 пуля и пробивание +2", (r) => {
+        r.gun.pellets += 1;
+        r.gun.pierce += 2;
+      }),
     ];
   }
   return [
@@ -60,6 +75,10 @@ function volleyCards(level) {
     }),
     card("through", "Насквозь", "Пуля не останавливается. Следующая цель получает 75% урона", (r) => {
       r.gun.falloff = 0.75;
+    }),
+    card("curtain", "Завеса", "+2 пули и пробивание +1", (r) => {
+      r.gun.pellets += 2;
+      r.gun.pierce += 1;
     }),
   ];
 }
@@ -71,7 +90,11 @@ function ricochetCards(level) {
         r.gun.bounces += 2;
       }),
       card("edge", "Кромка", "После отскока урон пули +50%", (r) => {
-        r.gun.edgeMul = 1.5;
+        r.gun.edgeMul = Math.max(r.gun.edgeMul || 1, 1.5);
+      }),
+      card("bank", "Двойной край", "+1 отскок и урон после отскока +25%", (r) => {
+        r.gun.bounces += 1;
+        r.gun.edgeMul = (r.gun.edgeMul || 1) * 1.25;
       }),
     ];
   }
@@ -82,50 +105,139 @@ function ricochetCards(level) {
     card("loop", "Петля", "+3 отскока, урон на отскоках не падает", (r) => {
       r.gun.bounces += 3;
     }),
+    card("boom", "Бумеранг", "+2 отскока, пули живут дольше", (r) => {
+      r.gun.bounces += 2;
+      r.gun.life += 0.5;
+    }),
   ];
 }
 
-function autoStep(level, branch) {
-  const steps = {
-    2: ["Урон +25%", (r) => (r.gun.dmg *= 1.25)],
-    3: ["+1 выстрел в секунду", (r) => addRate(r.gun, 1)],
-    4: ["Урон +25%", (r) => (r.gun.dmg *= 1.25)],
+function at(id, title, desc, rarity, apply, once) {
+  return { ...card(id, title, desc, apply, rarity), once };
+}
+
+export function gunPool(branch) {
+  const shared = [
+    at("cal", "Калибр", "Урон +15%", "common", (r) => (r.gun.dmg *= 1.15)),
+    at("tempo", "Темп", "+1 выстрел в секунду", "common", (r) => addRate(r.gun, 1)),
+    at("rush", "Разгон", "Пули быстрее", "common", (r) => (r.gun.speed += 80)),
+    at("range", "Дальность", "Пули живут дольше", "common", (r) => (r.gun.life += 0.35)),
+    at("mass", "Масса", "Урон +12%", "common", (r) => (r.gun.dmg *= 1.12)),
+    at("barrel", "Ствол", "+1 выстрел в секунду", "common", (r) => addRate(r.gun, 1)),
+    at("trace", "След", "Пули живут дольше", "common", (r) => (r.gun.life += 0.25)),
+    at("press", "Нажим", "Урон +18%", "common", (r) => (r.gun.dmg *= 1.18)),
+    at("heavy", "Тяжёлый калибр", "Урон +30%", "rare", (r) => (r.gun.dmg *= 1.3)),
+    at("boost", "Ускоритель", "+2 выстрела в секунду", "rare", (r) => addRate(r.gun, 2)),
+    at("shell", "Снаряд", "Урон +20% и пули быстрее", "rare", (r) => {
+      r.gun.dmg *= 1.2;
+      r.gun.speed += 80;
+    }),
+    at("long", "Длинный ствол", "Пули живут заметно дольше", "rare", (r) => (r.gun.life += 0.6)),
+    at("ap", "Бронебой", "Урон +15% и пробивание +1", "rare", (r) => {
+      r.gun.dmg *= 1.15;
+      r.gun.pierce += 1;
+    }),
+    at("force", "Форсаж", "Урон +40% и +1 выстрел в секунду", "epic", (r) => {
+      r.gun.dmg *= 1.4;
+      addRate(r.gun, 1);
+    }),
+    at("gale", "Шквал", "+3 выстрела в секунду", "epic", (r) => addRate(r.gun, 3)),
+    at("mono", "Монолит", "Урон +50%", "epic", (r) => (r.gun.dmg *= 1.5)),
+  ];
+  const branches = {
+    queue: [
+      at("spark", "Искра", "Шанс крита +4%", "common", (r) => addCrit(r, 0.04)),
+      at("rhythm", "Ритм", "+1 выстрел в секунду", "common", (r) => addRate(r.gun, 1)),
+      at("hone", "Заточка", "Шанс крита +4% и урон +8%", "common", (r) => {
+        addCrit(r, 0.04);
+        r.gun.dmg *= 1.08;
+      }),
+      at("cadence", "Каденция", "Шанс крита +4%", "common", (r) => addCrit(r, 0.04)),
+      at("sharp", "Острота", "Шанс крита +8%", "rare", (r) => addCrit(r, 0.08)),
+      at("drumlet", "Дробный темп", "+2 выстрела в секунду", "rare", (r) => addRate(r.gun, 2)),
+      at("keen", "Лезвие", "Критический урон +0.25", "rare", (r) => addCritMul(r, 0.25)),
+      at("sight", "Прицел", "Шанс крита +6% и урон +10%", "rare", (r) => {
+        addCrit(r, 0.06);
+        r.gun.dmg *= 1.1;
+      }),
+      at("reprisal", "Расправа", "Шанс крита +12%", "epic", (r) => addCrit(r, 0.12)),
+      at("stream", "Непрерывный", "+3 выстрела в секунду и шанс крита +4%", "epic", (r) => {
+        addRate(r.gun, 3);
+        addCrit(r, 0.04);
+      }),
+      at("cleave", "Рассечение", "Критический урон +0.5", "epic", (r) => addCritMul(r, 0.5)),
+    ],
+    volley: [
+      at("pel1", "Веер", "+1 пуля", "common", (r) => (r.gun.pellets += 1)),
+      at("prc1", "Пробой", "Пробивание +1", "common", (r) => (r.gun.pierce += 1)),
+      at("pel1b", "Шире", "+1 пуля", "common", (r) => (r.gun.pellets += 1)),
+      at("heavy-p", "Тяжёлая дробь", "Урон пули +12%", "common", (r) => (r.gun.dmg *= 1.12)),
+      at("buck-r", "Картечь", "+2 пули, урон каждой −5%", "rare", (r) => {
+        r.gun.pellets += 2;
+        r.gun.dmg *= 0.95;
+      }),
+      at("prc2", "Сквозной", "Пробивание +2", "rare", (r) => (r.gun.pierce += 2)),
+      at("salvo", "Залп+", "+1 пуля и урон +20%", "rare", (r) => {
+        r.gun.pellets += 1;
+        r.gun.dmg *= 1.2;
+      }),
+      at("wall-s", "Плотнее", "+3 пули, залп чуть плотнее", "epic", (r) => {
+        r.gun.pellets += 3;
+        r.gun.gap = Math.max(6, r.gun.gap * 0.85);
+      }),
+      at("drill", "Бур", "Пробивание +3", "epic", (r) => (r.gun.pierce += 3)),
+      at("cloud", "Облако", "+2 пули и пробивание +1", "epic", (r) => {
+        r.gun.pellets += 2;
+        r.gun.pierce += 1;
+      }),
+    ],
+    ricochet: [
+      at("b1", "Отскок", "+1 отскок", "common", (r) => (r.gun.bounces += 1)),
+      at("b1b", "Кромка", "+1 отскок", "common", (r) => (r.gun.bounces += 1)),
+      at("live", "Живучесть", "Пули живут дольше", "common", (r) => (r.gun.life += 0.35)),
+      at("ric-d", "Удар от края", "Урон +10%", "common", (r) => (r.gun.dmg *= 1.1)),
+      at("b2", "Карусель", "+2 отскока", "rare", (r) => (r.gun.bounces += 2)),
+      at("edge-r", "Закалка", "После отскока урон +25%", "rare", (r) => {
+        r.gun.edgeMul = (r.gun.edgeMul || 1) * 1.25;
+      }),
+      at("fast-b", "Быстрый отскок", "+1 отскок и пули быстрее", "rare", (r) => {
+        r.gun.bounces += 1;
+        r.gun.speed += 80;
+      }),
+      at("b3", "Петля", "+3 отскока", "epic", (r) => (r.gun.bounces += 3)),
+      at("mirror", "Зеркало", "После отскока урон +50%", "epic", (r) => {
+        r.gun.edgeMul = (r.gun.edgeMul || 1) * 1.5;
+      }),
+      at("spark-s", "Искра от стены", "Удар о край выпускает короткую пулю, 50% урона", "epic", (r) => {
+        r.gun.swarm = true;
+      }, "swarm"),
+    ],
   };
-  const byBranch = {
-    queue: {
-      6: ["+1 выстрел в секунду", (r) => addRate(r.gun, 1)],
-      7: ["Шанс крита +6%", (r) => addCrit(r, 0.06)],
-      8: ["Урон +20%", (r) => (r.gun.dmg *= 1.2)],
-      9: ["+1 выстрел в секунду", (r) => addRate(r.gun, 1)],
-      11: ["Шанс крита +6%", (r) => addCrit(r, 0.06)],
-      12: ["Урон +20%", (r) => (r.gun.dmg *= 1.2)],
-      13: ["+1 выстрел в секунду", (r) => addRate(r.gun, 1)],
-      14: ["Шанс крита +6%", (r) => addCrit(r, 0.06)],
-    },
-    volley: {
-      6: ["+1 пуля", (r) => (r.gun.pellets += 1)],
-      7: ["Пробивание +1", (r) => (r.gun.pierce += 1)],
-      8: ["Урон пули +20%", (r) => (r.gun.dmg *= 1.2)],
-      9: ["+1 пуля", (r) => (r.gun.pellets += 1)],
-      11: ["Урон пули +15%", (r) => (r.gun.dmg *= 1.15)],
-      12: ["Пробивание +1", (r) => (r.gun.pierce += 1)],
-      13: ["+1 пуля", (r) => (r.gun.pellets += 1)],
-      14: ["Урон пули +15%", (r) => (r.gun.dmg *= 1.15)],
-    },
-    ricochet: {
-      6: ["Урон +20%", (r) => (r.gun.dmg *= 1.2)],
-      7: ["Пули живут дольше", (r) => (r.gun.life += 0.7)],
-      8: ["+1 отскок", (r) => (r.gun.bounces += 1)],
-      9: ["Урон +20%", (r) => (r.gun.dmg *= 1.2)],
-      11: ["Урон +15%", (r) => (r.gun.dmg *= 1.15)],
-      12: ["+1 отскок", (r) => (r.gun.bounces += 1)],
-      13: ["Пули быстрее", (r) => (r.gun.speed += 160)],
-      14: ["Урон +15%", (r) => (r.gun.dmg *= 1.15)],
-    },
-  };
-  const row = steps[level] || byBranch[branch]?.[level];
-  if (!row) return null;
-  return { desc: row[0], apply: row[1] };
+  return branch && branches[branch] ? shared.concat(branches[branch]) : shared;
+}
+
+export function rollGunOffer(branch, gun = {}, n = 3, rng = Math.random) {
+  const pool = gunPool(branch).filter((c) => !(c.once && gun[c.once]));
+  const out = [];
+  const used = new Set();
+  let guard = 0;
+  while (out.length < n && guard++ < 40) {
+    const available = pool.filter((c) => !used.has(c.id));
+    if (!available.length) break;
+    const sum = available.reduce((acc, c) => acc + (RARITY_WEIGHT[c.rarity] || 1), 0);
+    let roll = rng() * sum;
+    let picked = available[0];
+    for (const c of available) {
+      roll -= RARITY_WEIGHT[c.rarity] || 1;
+      if (roll <= 0) {
+        picked = c;
+        break;
+      }
+    }
+    used.add(picked.id);
+    out.push(picked);
+  }
+  return out;
 }
 
 export function gunStep(level, branch) {
@@ -155,8 +267,11 @@ export function gunStep(level, branch) {
     const cards = branch === "queue" ? queueCards(level) : branch === "volley" ? volleyCards(level) : ricochetCards(level);
     return { kind: "choice", sub: "Легендарное улучшение ветки", cards };
   }
-  const auto = autoStep(level, branch);
-  return auto ? { kind: "auto", ...auto } : null;
+  return {
+    kind: "choice",
+    sub: "Три усиления. Обычные выпадают чаще, эпики реже.",
+    cards: rollGunOffer(branch),
+  };
 }
 
 export function rollGunShot(gun) {

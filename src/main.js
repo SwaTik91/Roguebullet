@@ -56,7 +56,8 @@ const ui = {
     cards.forEach((card) => {
       const btn = document.createElement("button");
       btn.className = `card ${card.rarity}`;
-      btn.innerHTML = `<small>${card.rarity === "epic" ? "ЛЕГЕНДАРКА" : card.rarity === "rare" ? "РЕДКАЯ" : "ОБЫЧНАЯ"}</small><strong>${card.title}</strong><p>${card.desc}</p>`;
+      const labels = { legendary: "ЛЕГЕНДАРКА", epic: "ЭПИК", rare: "РЕДКАЯ", common: "ОБЫЧНАЯ" };
+      btn.innerHTML = `<small>${labels[card.rarity] || "ОБЫЧНАЯ"}</small><strong>${card.title}</strong><p>${card.desc}</p>`;
       btn.onclick = () => game.applyCard(card);
       $("card-row").appendChild(btn);
     });

@@ -294,6 +294,10 @@ h2 {
 }
 
 .card.epic {
+  border-color: rgba(192, 132, 252, 0.7);
+}
+
+.card.legendary {
   border-color: rgba(255, 179, 71, 0.55);
 }
 
