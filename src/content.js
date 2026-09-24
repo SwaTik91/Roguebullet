@@ -105,6 +105,35 @@ export function cardPool(run) {
   return cards;
 }
 
+const QUEUED_CARDS = {
+  Калибр: (r) => (r.gun.dmg *= 1.35),
+  Темп: (r) => (r.gun.rate *= 1.25),
+  Сервопривод: (r) => (r.gun.autoTurn *= 1.45),
+  Пластины: (r) => {
+    r.tower.maxHp += 80;
+    r.tower.hp += 80;
+    r.tower.regen += 1.2;
+  },
+};
+
+export function applyQueuedCard(run, title) {
+  const apply = QUEUED_CARDS[title];
+  if (!apply) return false;
+  apply(run);
+  return true;
+}
+
+export function startingLoadout(profile = {}) {
+  const weapons = { gun: true, drone: true };
+  const wepStats = {};
+  for (const id of profile.weapons || []) {
+    if (!WEAPON_INFO[id] || id === "gun" || id === "drone") continue;
+    weapons[id] = true;
+    wepStats[id] = defaultWep(id);
+  }
+  return { weapons, wepStats, cards: profile.fourthCard ? 4 : 3 };
+}
+
 export function defaultWep(id) {
   switch (id) {
     case "laser":

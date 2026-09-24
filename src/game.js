@@ -1,4 +1,4 @@
-import { SHAPES, WEAPON_INFO, endlessEnemyWave, enemyForWave, waveCount } from "./content.js";
+import { SHAPES, WEAPON_INFO, applyQueuedCard, endlessEnemyWave, enemyForWave, startingLoadout, waveCount } from "./content.js";
 import { rayEnd, reflectAngle } from "./laser.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
@@ -105,6 +105,7 @@ export class Game {
     const startLevel = Math.min(3, Math.max(1, Number(level) || 1));
     const atk = 1 + (hangar.atk || 0) * 0.12;
     const hp = 220 + (hangar.hp || 0) * 40;
+    const gear = startingLoadout(profile);
     this.run = {
       runId: newId(),
       startedLevel: startLevel,
@@ -129,8 +130,9 @@ export class Game {
       endless: false,
       power: 1,
       levelCoins: 0,
-      weapons: { gun: true, drone: true },
-      wepStats: {},
+      weapons: gear.weapons,
+      wepStats: gear.wepStats,
+      offerCount: gear.cards,
       drones: [],
       drone: {
         dmg: 22,
@@ -193,6 +195,23 @@ export class Game {
     this.syncDrones();
     this.queueWave();
     this.ui.updateHud(this.run);
+    this.pullQueuedCard();
+  }
+
+  async pullQueuedCard() {
+    if (!api?.takeCard || !this.run) return;
+    const runId = this.run.runId;
+    try {
+      const taken = await api.takeCard(runId);
+      if (taken?.profile) this.ui.applyProfile?.(taken.profile);
+      if (!this.run || this.run.runId !== runId || !taken?.card) return;
+      if (applyQueuedCard(this.run, taken.card)) {
+        this.ui.toast(taken.card);
+        this.ui.updateHud(this.run);
+      }
+    } catch {
+      // The run still starts if the chest card cannot be fetched.
+    }
   }
 
   queueWave() {
@@ -398,7 +417,7 @@ export class Game {
       offer.xp -= offer.next;
       offer.level += 1;
       offer.next = gunXpToNext(offer.level) || 500 + offer.level * 40;
-      const cards = rollBattleOffer(this.run);
+      const cards = rollBattleOffer(this.run, this.run.offerCount || 3);
       this.state = "cards";
       this.ui.showCards(cards, {
         title: "УСИЛЕНИЕ",
@@ -451,7 +470,7 @@ export class Game {
   async rerollCards() {
     const result = await api.buyReroll(this.run.runId, this.run.offer.level);
     if (result.profile) this.ui.applyProfile?.(result.profile);
-    this.ui.showCards(rollBattleOffer(this.run), null, result.used);
+    this.ui.showCards(rollBattleOffer(this.run, this.run.offerCount || 3), null, result.used);
     this.audio.pickup();
   }
 
