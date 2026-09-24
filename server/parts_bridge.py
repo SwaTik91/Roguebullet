@@ -1,13 +1,21 @@
 import json
+import os
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _node():
+    for candidate in ("/usr/local/bin/node", "node"):
+        if candidate == "node" or os.path.isfile(candidate):
+            return candidate
+    return "node"
+
+
 def _call(payload):
     proc = subprocess.run(
-        ["node", "server/parts-cli.mjs"],
+        [_node(), "server/parts-cli.mjs"],
         cwd=str(ROOT),
         input=json.dumps(payload, ensure_ascii=False),
         capture_output=True,
