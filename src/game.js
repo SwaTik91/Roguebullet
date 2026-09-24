@@ -445,11 +445,13 @@ export class Game {
   syncDrones() {
     const need = this.run.drone?.count || this.run.wepStats.drone?.count || 0;
     while (this.run.drones.length < need) {
+      const i = this.run.drones.length;
+      const a = (i / Math.max(need, 1)) * Math.PI * 2 - Math.PI / 2;
       this.run.drones.push({
-        x: this.run.tower.x,
-        y: this.run.tower.y - 80,
-        a: Math.random() * Math.PI * 2,
-        cd: 0,
+        x: this.run.tower.x + Math.cos(a) * 120,
+        y: this.run.tower.y + Math.sin(a) * 120,
+        orbit: a,
+        cd: i * 0.08,
       });
     }
   }
@@ -744,11 +746,20 @@ export class Game {
     if (r.weapons.drone && r.drone) {
       this.syncDrones();
       const st = r.drone;
-      for (const d of r.drones) {
-        const t = this.nearest(d);
-        const want = t ? t : { x: tw.x, y: tw.y - 140 };
-        d.x = lerp(d.x, want.x, 1.8 * dt);
-        d.y = lerp(d.y, want.y - 40, 1.8 * dt);
+      const claimed = new Set();
+      r.drones.forEach((d, i) => {
+        const own = this.nearest(d, (e) => !claimed.has(e));
+        const t = own || this.nearest(d);
+        if (t) claimed.add(t);
+        const n = r.drones.length;
+        const spread = (i - (n - 1) / 2) * 0.85;
+        const orbit = d.orbit ?? i * 1.2;
+        const hover = t ? angTo(tw, t) + spread : orbit;
+        const want = t
+          ? { x: t.x + Math.cos(hover) * 86, y: t.y + Math.sin(hover) * 86 }
+          : { x: tw.x + Math.cos(orbit) * 130, y: tw.y + Math.sin(orbit) * 130 };
+        d.x = lerp(d.x, want.x, 3.4 * dt);
+        d.y = lerp(d.y, want.y, 3.4 * dt);
         d.cd -= dt;
         if (t && d.cd <= 0) {
           const pellets = st.pellets || 1;
@@ -774,6 +785,24 @@ export class Game {
           }
           if (st.bombs && !st.bombOnHit) this.explode(d.x, d.y + 10, st.radius, st.dmg * st.bombMul);
           d.cd = st.cd;
+        }
+      });
+      const min = 48;
+      for (let i = 0; i < r.drones.length; i++) {
+        for (let j = i + 1; j < r.drones.length; j++) {
+          const a = r.drones[i];
+          const b = r.drones[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const gap = Math.hypot(dx, dy);
+          if (gap >= min) continue;
+          const nx = gap < 0.01 ? 1 : dx / gap;
+          const ny = gap < 0.01 ? 0 : dy / gap;
+          const push = (min - gap) * 0.5;
+          a.x -= nx * push;
+          a.y -= ny * push;
+          b.x += nx * push;
+          b.y += ny * push;
         }
       }
     }
