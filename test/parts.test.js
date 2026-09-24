@@ -7,8 +7,9 @@ import {
   unequip,
   sumBonuses,
   applyBonuses,
+  describeAffix,
 } from "../src/parts.js";
-import { Game } from "../src/game.js";
+import { Game, retryPendingPartRolls } from "../src/game.js";
 
 function rngFrom(values) {
   let i = 0;
@@ -52,6 +53,17 @@ test("common and rare gun parts never roll bounce", () => {
       assert.ok(!p.affixes.some((a) => a.id === "bounce"));
     }
   }
+});
+
+test("describeAffix formats epic regen without float junk", () => {
+  const text = describeAffix(null, { id: "regen", name: "регенерация", step: 3 });
+  assert.ok(!text.includes("00000"));
+  assert.match(text, /\+1\.2$/);
+});
+
+test("describeAffix keeps a leading zero on negative cooldown", () => {
+  const text = describeAffix("drone", { id: "cd", name: "перезарядка", step: 1 });
+  assert.equal(text, "перезарядка: -0.02");
 });
 
 test("part affix ids differ", () => {
@@ -278,6 +290,9 @@ function headlessGame(rollPart) {
     applyProfile(profile) {
       this.profiles.push(profile);
     },
+    async onEndlessWave(_level, _wave, partLine) {
+      if (partLine) this.toasts.push(partLine);
+    },
   };
   const audio = new Proxy({}, { get: () => () => {} });
   const game = new Game(null, ui, audio, { bestWave: 0 }, { headless: true, rollPart });
@@ -304,15 +319,58 @@ test("showLevelClear requests a level part roll", async () => {
 });
 
 test("showLevelClear survives a rejected part roll", async () => {
-  const { game, ui } = headlessGame(async () => {
-    throw new Error("network");
+  const rollCalls = [];
+  let fail = true;
+  const { game, ui } = headlessGame(async (body) => {
+    rollCalls.push(body);
+    if (fail) throw new Error("network");
+    return stubPartRoll;
   });
+  const storage = {};
+  globalThis.localStorage = {
+    getItem(key) {
+      return storage[key] ?? null;
+    },
+    setItem(key, value) {
+      storage[key] = String(value);
+    },
+    removeItem(key) {
+      delete storage[key];
+    },
+  };
   game.profile = { clearedLevels: [] };
   await game.startRun(1);
   game.showLevelClear();
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(ui.levelClearPart, null);
   assert.equal(ui.profiles.length, 0);
+  assert.equal(rollCalls.length, 1);
+  assert.ok(storage["roguebullet-pending-part-roll"]);
+
+  fail = false;
+  await retryPendingPartRolls(game);
+  assert.equal(rollCalls.length, 2);
+  assert.deepEqual(rollCalls[1], rollCalls[0]);
+  assert.match(ui.levelClearPart, /Ствол/);
+  assert.equal(storage["roguebullet-pending-part-roll"], undefined);
+});
+
+test("late level part roll does not overwrite a newer clear", async () => {
+  let resolveRoll;
+  const { game, ui } = headlessGame(
+    () =>
+      new Promise((resolve) => {
+        resolveRoll = () => resolve(stubPartRoll);
+      }),
+  );
+  game.profile = { clearedLevels: [] };
+  await game.startRun(1);
+  game.showLevelClear();
+  game.continueLevel();
+  resolveRoll();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(ui.levelClearPart, null);
+  assert.equal(game.run.level, 2);
 });
 
 test("endless part roll only every fifth endless wave cleared", async () => {

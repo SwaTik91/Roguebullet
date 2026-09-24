@@ -256,6 +256,13 @@ export function rollPart(rng, ownedWeapons, options = {}) {
   return part;
 }
 
+export function formatAffixNumber(value) {
+  const rounded = Math.round(value * 100) / 100;
+  let text = rounded.toFixed(2);
+  text = text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  return text;
+}
+
 export function describeAffix(family, affix) {
   const table = family ? AFFIX_META[family] : AFFIX_META.common;
   const meta = table?.[affix.id];
@@ -271,13 +278,13 @@ export function describeAffix(family, affix) {
     }
     if (meta.bonus === "crit") return `${name}: +${Math.round(raw * 100)}%`;
     if (meta.bonus === "charge") return `${name}: +${Math.round(raw * 100)}% к набору`;
-    if (raw < 0) return `${name}: ${raw.toFixed(2).replace(/-0/, "-")}`;
-    return `${name}: +${raw}`;
+    if (raw < 0) return `${name}: ${formatAffixNumber(raw)}`;
+    return `${name}: +${formatAffixNumber(raw)}`;
   }
 
   if (meta?.epic != null) {
     const val = rarity === "legendary" ? meta.legendary : meta.epic;
-    return `${name}: +${val}`;
+    return `${name}: +${formatAffixNumber(val)}`;
   }
 
   return `${name}`;

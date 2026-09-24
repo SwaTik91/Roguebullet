@@ -7,6 +7,7 @@ import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
 import { sumBonuses, applyBonuses } from "./parts.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
+const PENDING_PART_ROLL_KEY = "roguebullet-pending-part-roll";
 const gatling = typeof Image === "undefined" ? null : new Image();
 if (gatling) gatling.src = "/gatling.png";
 
@@ -1120,39 +1121,66 @@ export class Game {
     return `${part.baseName || part.base} · ${rarity}`;
   }
 
-  async requestLevelPartRoll() {
+  partRollBody(kind, levelOrWave) {
     const r = this.run;
-    if (!r?.runId) return;
-    try {
-      const result = await this.rollPart({ runId: r.runId, kind: "level", level: r.level });
-      if (result?.profile) this.ui.applyProfile?.(result.profile);
-      if (result?.part) this.ui.setLevelClearPart?.(this.partDropLine(result.part));
-    } catch {
-      // Level-clear screen stays usable without a part line.
+    if (!r?.runId) return null;
+    if (kind === "level") return { runId: r.runId, kind: "level", level: levelOrWave ?? r.level };
+    if (kind === "endless") {
+      const wave = levelOrWave;
+      if (!wave || wave % 5 !== 0) return null;
+      return { runId: r.runId, kind: "endless", level: r.level, wave };
     }
+    return null;
+  }
+
+  partRollStillMatches(body) {
+    const r = this.run;
+    if (!r || r.runId !== body.runId) return false;
+    if (body.kind === "level") return body.level === r.level;
+    if (body.kind === "endless") return body.wave === r.endlessWaves;
+    return false;
+  }
+
+  applyPartRollResult(body, result) {
+    if (result?.profile) this.ui.applyProfile?.(result.profile);
+    if (!result?.part || !this.partRollStillMatches(body)) return null;
+    return this.partDropLine(result.part);
+  }
+
+  async sendPartRoll(body) {
+    rememberPendingPartRoll(body);
+    try {
+      const result = await this.rollPart(body);
+      forgetPendingPartRoll(partRollKey(body));
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
+  async requestLevelPartRoll() {
+    const body = this.partRollBody("level");
+    if (!body) return;
+    const result = await this.sendPartRoll(body);
+    if (!result) return;
+    const line = this.applyPartRollResult(body, result);
+    if (line) this.ui.setLevelClearPart?.(line);
   }
 
   async requestEndlessPartRoll(endlessWave) {
-    const r = this.run;
-    if (!r?.runId || endlessWave % 5 !== 0) return;
-    try {
-      const result = await this.rollPart({
-        runId: r.runId,
-        kind: "endless",
-        level: r.level,
-        wave: endlessWave,
-      });
-      if (result?.profile) this.ui.applyProfile?.(result.profile);
-      if (result?.part) this.ui.toast?.(this.partDropLine(result.part));
-    } catch {
-      // Endless play continues if the roll fails.
-    }
+    const body = this.partRollBody("endless", endlessWave);
+    if (!body) return null;
+    const result = await this.sendPartRoll(body);
+    if (!result) return null;
+    return this.applyPartRollResult(body, result);
   }
 
-  endlessWaveCleared() {
+  async endlessWaveCleared() {
     const r = this.run;
     r.endlessWaves = (r.endlessWaves || 0) + 1;
-    void this.requestEndlessPartRoll(r.endlessWaves);
+    let partLine = null;
+    if (r.endlessWaves % 5 === 0) partLine = await this.requestEndlessPartRoll(r.endlessWaves);
+    await this.ui.onEndlessWave?.(r.level, r.wave, partLine);
   }
 
   showLevelClear() {
@@ -1494,8 +1522,7 @@ export class Game {
       if (r.wavePause > 1.15) {
         r.wavesCleared += 1;
         if (r.endless) {
-          this.ui.onEndlessWave?.(r.level, r.wave);
-          this.endlessWaveCleared();
+          void this.endlessWaveCleared();
           r.power *= 2;
           r.wave += 1;
           if (r.wave > 40) {
@@ -2143,6 +2170,55 @@ export async function retryPendingClaims(onProfile) {
       const result = await api.claimRun(facts);
       forgetPending(facts.runId);
       if (result.profile) onProfile?.(result.profile);
+    } catch {
+      return;
+    }
+  }
+}
+
+function partRollKey(body) {
+  if (body.kind === "level") return `${body.runId}:level:${body.level}`;
+  return `${body.runId}:endless:${body.wave}`;
+}
+
+function readPendingPartRolls() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PENDING_PART_ROLL_KEY) || "null");
+    if (!parsed) return [];
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingPartRolls(list) {
+  if (typeof localStorage === "undefined") return;
+  if (!list.length) localStorage.removeItem(PENDING_PART_ROLL_KEY);
+  else localStorage.setItem(PENDING_PART_ROLL_KEY, JSON.stringify(list.length === 1 ? list[0] : list));
+}
+
+function rememberPendingPartRoll(body) {
+  if (typeof localStorage === "undefined") return;
+  const key = partRollKey(body);
+  const list = readPendingPartRolls().filter((item) => partRollKey(item) !== key);
+  list.push(body);
+  writePendingPartRolls(list);
+}
+
+function forgetPendingPartRoll(key) {
+  writePendingPartRolls(readPendingPartRolls().filter((item) => partRollKey(item) !== key));
+}
+
+export async function retryPendingPartRolls(game) {
+  for (const body of readPendingPartRolls()) {
+    try {
+      const result = await game.rollPart(body);
+      forgetPendingPartRoll(partRollKey(body));
+      const line = game.applyPartRollResult(body, result);
+      if (line) {
+        if (body.kind === "level") game.ui.setLevelClearPart?.(line);
+        else game.ui.toast?.(line);
+      }
     } catch {
       return;
     }

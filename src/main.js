@@ -7,7 +7,7 @@ import { api, newId } from "./api.js";
 import { describeAffix } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
-import { retryPendingClaims } from "./game.js";
+import { retryPendingClaims, retryPendingPartRolls } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
 const audio = new Synth();
@@ -23,6 +23,7 @@ const ui = {
     hideAll();
     $("hud").classList.remove("hidden");
     retryPendingClaims(applyProfile);
+    retryPendingPartRolls(game);
   },
   updateHud(run) {
     $("hud-wave").textContent = String(run.wave);
@@ -117,13 +118,17 @@ const ui = {
     $("screen-level-clear").classList.add("hidden");
     $("hud").classList.remove("hidden");
   },
-  async onEndlessWave(level, wave) {
+  async onEndlessWave(level, wave, partLine) {
+    const partSuffix = partLine ? ` · ${partLine}` : "";
     try {
       const result = await api.claimEndless(level, wave);
       if (result.profile) applyProfile(result.profile);
-      ui.toast(result.granted ? `+${result.granted} кристаллов за волну ${wave}` : `Волна ${wave} уже была забрана`);
+      const crystalText = result.granted
+        ? `+${result.granted} кристаллов за волну ${wave}`
+        : `Волна ${wave} уже была забрана`;
+      ui.toast(`${crystalText}${partSuffix}`);
     } catch {
-      ui.toast("Кристаллы за волну придут при появлении связи");
+      ui.toast(`Кристаллы за волну придут при появлении связи${partSuffix}`);
     }
   },
   showResult(win, run, granted, extra = {}) {
@@ -235,6 +240,7 @@ function showMenu() {
   $("screen-menu").classList.remove("hidden");
   refreshMenu();
   retryPendingClaims(applyProfile);
+  retryPendingPartRolls(game);
   if (!meta.seenHow) {
     hideAll();
     $("screen-how").classList.remove("hidden");
