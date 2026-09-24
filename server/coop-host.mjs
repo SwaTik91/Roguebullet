@@ -1,10 +1,8 @@
 import crypto from "node:crypto";
 import http from "node:http";
-import { Game } from "../src/game.js";
-import { coopSnapshot, ensureSeats } from "../src/coop.js";
 
 const rooms = new Map();
-const audio = new Proxy({}, { get: () => () => {} });
+const FRAME = 1000 / 60;
 
 function acceptKey(key) {
   return crypto.createHash("sha1").update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest("base64");
@@ -67,73 +65,44 @@ function code() {
   return rooms.has(out) ? code() : out;
 }
 
-function openRoom(level) {
+function openRoom(msg) {
   const id = code();
   const room = {
     id,
-    level: Math.min(3, Math.max(1, Number(level) || 1)),
+    level: Math.min(3, Math.max(1, Number(msg.level) || 1)),
+    worldW: Math.max(320, Number(msg.worldW) || 720),
+    worldH: Math.max(480, Number(msg.worldH) || 1280),
+    profile: msg.profile || {},
     players: [],
-    game: null,
-    acc: 0,
-    ui: {},
-  };
-  room.ui = {
-    showPlay() {},
-    updateHud() {},
-    setCombo() {},
-    save() {},
-    hideCards() {},
-    hideLevelClear() {},
-    applyProfile() {},
-    toast() {},
-    onEndlessWave() {},
-    showCards(cards, heading) {
-      if (!room.game) return;
-      room.game.run._cards = cards;
-      room.game.run._heading = heading;
-    },
-    showLevelClear(info) {
-      if (room.game) room.game.run._levelClear = info;
-    },
-    showResult(win, _run, granted) {
-      if (room.game) room.game.run._result = { won: !!win, granted: granted || null };
-    },
+    seed: crypto.randomInt(1, 0x7fffffff),
   };
   rooms.set(id, room);
   return room;
 }
 
-function begin(room) {
-  const game = new Game(null, room.ui, audio, { bestWave: 0, bestLevel: 1 }, {
-    headless: true,
-    worldW: 720,
-    worldH: 1280,
-  });
-  game.profile = {};
-  game.startRun(room.level);
-  game.run.worldW = 720;
-  game.run.worldH = 1280;
-  ensureSeats(game.run, 720, 1280);
-  room.game = game;
+function relay(room, player, msg) {
+  const out = { ...msg, seat: player.seat };
+  if (out.t !== "in") out.applyTick = Math.floor((Date.now() - room.t0) / FRAME) + 10;
+  const text = JSON.stringify(out);
+  for (const item of room.players) sendText(item.socket, text);
 }
 
-function act(room, msg) {
-  const game = room.game;
-  if (!game) return;
-  if (msg.t === "in") {
-    const seat = game.run.seats?.[msg.seat];
-    if (!seat) return;
-    seat.pointer.x = Number(msg.x) || seat.x;
-    seat.pointer.y = Number(msg.y) || seat.y;
-    seat.pointer.down = !!msg.down;
-  } else if (msg.t === "pick") {
-    const card = (game.run._cards || []).find((item) => item.id === msg.id);
-    if (card) game.applyCard(card);
-  } else if (msg.t === "reroll") {
-    game.rerollOffer(Number(msg.used) || 0);
-  } else if (msg.t === "continue") game.continueLevel();
-  else if (msg.t === "endless") game.beginEndless();
-  else if (msg.t === "exit") game.exitAfterLevel();
+function begin(room) {
+  room.t0 = Date.now();
+  const now = room.t0;
+  for (const player of room.players) {
+    sendText(player.socket, JSON.stringify({
+      t: "go",
+      seed: room.seed,
+      worldW: room.worldW,
+      worldH: room.worldH,
+      level: room.level,
+      seat: player.seat,
+      t0: room.t0,
+      now,
+      profile: room.profile,
+    }));
+  }
 }
 
 const server = http.createServer((req, res) => {
@@ -159,7 +128,7 @@ server.on("upgrade", (req, socket) => {
       return;
     }
     if (msg.t === "host") {
-      const room = openRoom(msg.level);
+      const room = openRoom(msg);
       player.room = room;
       player.seat = 0;
       room.players.push(player);
@@ -179,8 +148,8 @@ server.on("upgrade", (req, socket) => {
       sendText(socket, JSON.stringify({ t: "room", code: room.id, seat: 1 }));
       return;
     }
-    if (!player.room) return;
-    act(player.room, { ...msg, seat: player.seat });
+    if (!player.room?.t0) return;
+    relay(player.room, player, msg);
   });
   socket.on("close", () => {
     const room = player.room;
@@ -190,17 +159,6 @@ server.on("upgrade", (req, socket) => {
   });
   socket.on("error", () => socket.destroy());
 });
-
-setInterval(() => {
-  for (const room of rooms.values()) {
-    if (!room.game || room.players.length < 2) continue;
-    room.game.update(1 / 30);
-    room.acc += 1;
-    if (room.acc % 2) continue;
-    const snap = JSON.stringify(coopSnapshot(room.game.run, room.game.state));
-    for (const player of room.players) sendText(player.socket, snap);
-  }
-}, 1000 / 30);
 
 const port = Number(process.env.PORT || 8090);
 server.listen(port, "0.0.0.0");

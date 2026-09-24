@@ -181,7 +181,7 @@ export function endlessEnemyWave(wave) {
   return ((wave - 1) % 5) + 1;
 }
 
-export function enemyForWave(wave, chapter, power = 1) {
+export function enemyForWave(wave, chapter, power = 1, rng = Math.random) {
   const scale = Math.pow(1.32, wave - 1) * (1 + (chapter - 1) * 0.42) * power;
   const table = [
     { type: "circle", hp: 50, speed: 58, dmg: 7, r: 16, color: "#7dd3fc", xp: 6, coins: 2 },
@@ -206,10 +206,10 @@ export function enemyForWave(wave, chapter, power = 1) {
   }
 
   let idx = 0;
-  if (wave >= 2 && Math.random() < 0.35) idx = 1;
-  if (wave >= 3 && Math.random() < 0.28) idx = 2;
-  if (wave >= 4 && Math.random() < 0.22) idx = 3;
-  if (wave >= 5 && Math.random() < 0.2) idx = 4;
+  if (wave >= 2 && rng() < 0.35) idx = 1;
+  if (wave >= 3 && rng() < 0.28) idx = 2;
+  if (wave >= 4 && rng() < 0.22) idx = 3;
+  if (wave >= 5 && rng() < 0.2) idx = 4;
   const e = { ...table[idx] };
   e.hp *= scale;
   e.dmg *= (1 + (wave - 1) * 0.06) * power;

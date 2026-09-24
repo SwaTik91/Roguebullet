@@ -3,7 +3,7 @@ import { rayEnd, reflectAngle } from "./laser.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
-import { ensureSeats, nearestSeat } from "./coop.js";
+import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const gatling = typeof Image === "undefined" ? null : new Image();
@@ -46,6 +46,8 @@ export class Game {
     this.queuedCard = options.queuedCard || null;
     this.coop = null;
     this.coopLock = false;
+    this.coopWorld = null;
+    this.rand = Math.random;
     if (this.headless) return;
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -65,9 +67,9 @@ export class Game {
     this.canvas.height = Math.floor(h * this.dpr);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
-    if (this.coopLock) {
-      this.worldW = 720;
-      this.worldH = 1280;
+    if (this.coopLock && this.coopWorld) {
+      this.worldW = this.coopWorld.w;
+      this.worldH = this.coopWorld.h;
       this.scale = Math.min(w / this.worldW, h / this.worldH);
       this.ox = (w - this.worldW * this.scale) / 2;
       this.oy = (h - this.worldH * this.scale) / 2;
@@ -214,7 +216,7 @@ export class Game {
     this.syncDrones();
     this.queueWave();
     this.ui.updateHud(this.run);
-    if (this.headless) {
+    if (this.headless || this.coop) {
       if (this.queuedCard) applyQueuedCard(this.run, this.queuedCard);
       return;
     }
@@ -252,16 +254,16 @@ export class Game {
     const n = this.run.endless ? 1000 : waveCount(wave);
     const power = this.run.power || 1;
     const kind = this.run.endless ? endlessEnemyWave(wave) : wave;
-    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(kind, chapter, power));
+    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(kind, chapter, power, this.rand));
     this.run.spawnTimer = 0.45;
     this.ui.updateHud(this.run);
   }
 
   releaseBoss() {
     const { wave, chapter } = this.run;
-    this.run.spawnQueue = [enemyForWave(wave, chapter)];
+    this.run.spawnQueue = [enemyForWave(wave, chapter, 1, this.rand)];
     const escorts = (26 + chapter * 8) * 10;
-    for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter));
+    for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter, 1, this.rand));
     this.run.spawnTimer = 0.2;
     this.shake = 18;
     this.audio.boom();
@@ -278,24 +280,24 @@ export class Game {
   }
 
   spawnEnemy(def, fromSplit, at) {
-    const side = Math.floor(Math.random() * 4);
+    const side = Math.floor(this.rand() * 4);
     let x;
     let y;
     if (fromSplit && at) {
-      x = at.x + (Math.random() - 0.5) * 30;
-      y = at.y + (Math.random() - 0.5) * 30;
+      x = at.x + (this.rand() - 0.5) * 30;
+      y = at.y + (this.rand() - 0.5) * 30;
     } else if (side === 0) {
-      x = 40 + Math.random() * (this.worldW - 80);
+      x = 40 + this.rand() * (this.worldW - 80);
       y = -36;
     } else if (side === 1) {
-      x = 40 + Math.random() * (this.worldW - 80);
+      x = 40 + this.rand() * (this.worldW - 80);
       y = this.worldH + 36;
     } else if (side === 2) {
       x = -36;
-      y = 40 + Math.random() * (this.worldH - 80);
+      y = 40 + this.rand() * (this.worldH - 80);
     } else {
       x = this.worldW + 36;
-      y = 40 + Math.random() * (this.worldH - 80);
+      y = 40 + this.rand() * (this.worldH - 80);
     }
     if (def.boss) {
       this.shake = Math.max(this.shake, 14);
@@ -310,7 +312,7 @@ export class Game {
       shield: def.shield || 0,
       maxShield: def.shield || 0,
       slow: 0,
-      phase: Math.random() * Math.PI * 2,
+      phase: this.rand() * Math.PI * 2,
       dead: false,
       fromSplit: !!fromSplit,
       id: (this._eid = (this._eid || 0) + 1),
@@ -351,7 +353,7 @@ export class Game {
   damage(e, amt, src, canCrit = true, forcedCrit = false) {
     if (e.dead) return false;
     let crit = false;
-    if (canCrit && this.run.crit && (forcedCrit || Math.random() < this.run.crit.chance)) {
+    if (canCrit && this.run.crit && (forcedCrit || this.rand() < this.run.crit.chance)) {
       amt *= this.run.crit.mul;
       crit = true;
     }
@@ -441,7 +443,8 @@ export class Game {
       offer.xp -= offer.next;
       offer.level += 1;
       offer.next = gunXpToNext(offer.level) || 500 + offer.level * 40;
-      const cards = rollBattleOffer(this.run, this.run.offerCount || 3);
+      const cards = rollBattleOffer(this.run, this.run.offerCount || 3, this.rand);
+      this.run._cards = cards;
       this.state = "cards";
       this.ui.showCards(cards, {
         title: "УСИЛЕНИЕ",
@@ -461,7 +464,7 @@ export class Game {
   }
 
   applyCard(card) {
-    if (this.coop) {
+    if (this.coop?.live && !this._coopEcho) {
       this.sendCoop({ t: "pick", id: card.id });
       return;
     }
@@ -476,6 +479,7 @@ export class Game {
       if (next) {
         const cards = legendaryOffer(this.run, key).map((item) => ({ ...item, milestone: true }));
         this.state = "cards";
+        this.run._cards = cards;
         this.ui.showCards(cards, {
           title: `${card.who} · ${next}`,
           sub: "Каждое 5-е улучшение этого оружия — легендарка",
@@ -500,12 +504,14 @@ export class Game {
   }
 
   rerollOffer(used = 0) {
-    this.ui.showCards(rollBattleOffer(this.run, this.run.offerCount || 3), null, used);
+    const cards = rollBattleOffer(this.run, this.run.offerCount || 3, this.rand);
+    this.run._cards = cards;
+    this.ui.showCards(cards, null, used);
     this.audio.pickup();
   }
 
   async rerollCards() {
-    if (this.coop) {
+    if (this.coop?.live && !this._coopEcho) {
       const result = await api.buyReroll(this.run.runId, this.run.offer?.level || 1);
       if (result.profile) this.ui.applyProfile?.(result.profile);
       this.sendCoop({ t: "reroll", used: result.used || 0 });
@@ -517,7 +523,9 @@ export class Game {
     }
     const result = await api.buyReroll(this.run.runId, this.run.offer.level);
     if (result.profile) this.ui.applyProfile?.(result.profile);
-    this.ui.showCards(rollBattleOffer(this.run, this.run.offerCount || 3), null, result.used);
+    const cards = rollBattleOffer(this.run, this.run.offerCount || 3, this.rand);
+    this.run._cards = cards;
+    this.ui.showCards(cards, null, result.used);
     this.audio.pickup();
   }
 
@@ -1114,7 +1122,7 @@ export class Game {
   }
 
   continueLevel() {
-    if (this.coop) {
+    if (this.coop?.live && !this._coopEcho) {
       this.sendCoop({ t: "continue" });
       return;
     }
@@ -1146,7 +1154,7 @@ export class Game {
   }
 
   beginEndless() {
-    if (this.coop) {
+    if (this.coop?.live && !this._coopEcho) {
       this.sendCoop({ t: "endless" });
       return;
     }
@@ -1169,7 +1177,7 @@ export class Game {
   }
 
   exitAfterLevel() {
-    if (this.coop) {
+    if (this.coop?.live && !this._coopEcho) {
       this.sendCoop({ t: "exit" });
       return;
     }
@@ -1211,6 +1219,11 @@ export class Game {
   }
 
   async claimFacts(facts, run) {
+    if (this.coop?.live && this.coop.seat !== 0) {
+      forgetPending(facts.runId);
+      if (this.run && this.run.runId === facts.runId) this.ui.showResult(!!facts.won, run, null);
+      return;
+    }
     if (!api?.claimRun) return;
     try {
       const result = await api.claimRun(facts);
@@ -1848,97 +1861,106 @@ export class Game {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
   }
 
-  feedCoop(snap) {
-    if (!this.coop) return;
-    this.coop.snap = snap;
+  beginCoop(data) {
+    this.coop = this.coop || {};
+    this.coop.seat = data.seat;
+    this.coop.t0 = data.t0;
+    this.coop.offset = (data.now || data.t0) - Date.now();
+    this.coop.tick = -1;
+    this.coop.inputs = [{}, {}];
+    this.coop.lastIn = [null, null];
+    this.coop.acts = {};
+    this.coop.live = true;
     this.coopLock = true;
-    this.worldW = 720;
-    this.worldH = 1280;
-    if (!this.run) this.run = {};
-    this.state = snap.state;
-    this.presentCoop(1);
-    if (snap.state === "cards" && snap.cardKey !== this.cardKey) {
-      this.cardKey = snap.cardKey;
-      this.ui.showCards(snap.cards, snap.heading, 0);
+    this.coopWorld = { w: data.worldW, h: data.worldH };
+    this.rand = mulberry32(data.seed >>> 0);
+    if (!this.headless) this.resize();
+    else {
+      this.worldW = data.worldW;
+      this.worldH = data.worldH;
     }
-    if (snap.state === "play" && this.cardKey) {
-      this.cardKey = "";
-      this.ui.hideCards();
+    const mine = this.profile;
+    if (data.profile) this.profile = data.profile;
+    this.startRun(data.level);
+    this.profile = mine;
+    ensureSeats(this.run, this.worldW, this.worldH);
+    this.ui.showPlay();
+  }
+
+  onCoop(msg) {
+    if (!this.coop) return;
+    if (msg.t === "in") {
+      const bag = this.coop.inputs[msg.seat] || (this.coop.inputs[msg.seat] = {});
+      bag[msg.tick] = { x: Number(msg.x) || 0, y: Number(msg.y) || 0, down: !!msg.down };
+      return;
     }
-    if (snap.state === "levelclear" && snap.levelClear && this._clearKey !== snap.wave) {
-      this._clearKey = snap.wave;
-      this.ui.showLevelClear(snap.levelClear);
+    if (!msg.applyTick && msg.applyTick !== 0) return;
+    const list = this.coop.acts[msg.applyTick] || (this.coop.acts[msg.applyTick] = []);
+    list.push(msg);
+  }
+
+  applyCoopTick(tick) {
+    const seats = this.run?.seats;
+    if (seats) {
+      for (let i = 0; i < seats.length; i++) {
+        const queued = this.coop.inputs[i]?.[tick];
+        if (queued) {
+          this.coop.lastIn[i] = queued;
+          delete this.coop.inputs[i][tick];
+        }
+        const inp = this.coop.lastIn[i];
+        if (!inp) continue;
+        seats[i].pointer.x = inp.x;
+        seats[i].pointer.y = inp.y;
+        seats[i].pointer.down = inp.down;
+      }
     }
-    if (snap.state === "result" && !this._resultShown) {
-      this._resultShown = true;
-      this.ui.showResult(!!snap.result?.won, this.run, snap.result?.granted || null, {});
+    const acts = this.coop.acts[tick];
+    if (!acts) return;
+    delete this.coop.acts[tick];
+    for (const act of acts) this.applyCoopAct(act);
+  }
+
+  applyCoopAct(act) {
+    this._coopEcho = true;
+    try {
+      if (act.t === "pick") {
+        const card = (this.run?._cards || []).find((item) => item.id === act.id);
+        if (card) this.applyCard(card);
+      } else if (act.t === "reroll") this.rerollOffer(Number(act.used) || 0);
+      else if (act.t === "continue") this.continueLevel();
+      else if (act.t === "endless") this.beginEndless();
+      else if (act.t === "exit") this.exitAfterLevel();
+    } finally {
+      this._coopEcho = false;
     }
   }
 
-  presentCoop(gain) {
-    const snap = this.coop?.snap;
-    if (!snap) return;
-    const run = this.run || {};
-    const pull = (prev, next) => {
-      const map = new Map((prev || []).map((item) => [item.id, item]));
-      return next.map((item) => {
-        const old = map.get(item.id);
-        if (!old || gain >= 1) return { ...item };
-        return { ...item, x: old.x + (item.x - old.x) * gain, y: old.y + (item.y - old.y) * gain };
-      });
-    };
-    run.enemies = pull(run.enemies, snap.enemies);
-    run.bullets = pull(run.bullets, snap.bullets);
-    run.drones = pull(run.drones, snap.drones);
-    run.fx = [];
-    run.pools = [];
-    run.weapons = snap.weapons || {};
-    run.wepStats = run.wepStats || {};
-    run.pips = snap.pips || {};
-    run.wave = snap.wave;
-    run.chapter = snap.chapter;
-    run.level = snap.level;
-    run.coins = snap.coins;
-    run.crit = { chance: snap.crit || 0 };
-    run.overdrive = snap.overdrive;
-    run.tower = { ...(run.tower || {}), ...snap.tower, r: 34 };
-    run.runId = snap.runId;
-    run.offer = { level: snap.offerLevel || 1 };
-    run.bossIntro = 0;
-    run.gun = run.gun || { angle: -Math.PI / 2 };
-    const mine = this.coop.seat || 0;
-    run.seats = snap.seats.map((seat, i) => {
-      const prev = run.seats?.[i] || seat;
-      const local = i === mine;
-      const pointer = local ? this.pointer : null;
-      let angle = prev.angle ?? seat.angle;
-      if (local && pointer?.down && run.tower) {
-        angle = Math.atan2(pointer.y - seat.y, pointer.x - seat.x);
-      } else {
-        let delta = seat.angle - angle;
-        while (delta > Math.PI) delta -= Math.PI * 2;
-        while (delta < -Math.PI) delta += Math.PI * 2;
-        angle += delta * gain;
+  stepCoop() {
+    const frame = 1000 / 60;
+    const now = Date.now() + (this.coop.offset || 0);
+    const target = Math.floor((now - this.coop.t0) / frame);
+    let guard = 0;
+    while (this.coop.tick < target && guard++ < 5) {
+      this.coop.tick += 1;
+      const tick = this.coop.tick;
+      if (tick % 2 === 0) {
+        this.sendCoop({
+          t: "in",
+          tick: tick + 8,
+          x: this.pointer.x,
+          y: this.pointer.y,
+          down: this.pointer.down,
+        });
       }
-      return { ...seat, r: 34, angle, pointer: local ? pointer : { down: false } };
-    });
-    this.run = run;
-    this.ui.setCore?.(run);
-    if (this._hudWave !== run.wave || this._hudCoins !== run.coins) {
-      this._hudWave = run.wave;
-      this._hudCoins = run.coins;
-      this.ui.updateHud?.(run);
+      this.applyCoopTick(tick);
+      this.update(1 / 60);
     }
   }
 
   loop(t) {
-    if (this.coop?.snap) {
-      this.presentCoop(0.42);
-      if (t - (this.coop.sent || 0) > 50) {
-        this.coop.sent = t;
-        this.sendCoop({ t: "in", x: this.pointer.x, y: this.pointer.y, down: this.pointer.down });
-      }
-      this.draw(0);
+    if (this.coop?.live) {
+      this.stepCoop();
       requestAnimationFrame((n) => this.loop(n));
       return;
     }

@@ -385,13 +385,15 @@ function coopSocket(msg) {
       return;
     }
     if (data.t === "room") {
-      game.coop = { ws, seat: data.seat, snap: null };
+      game.coop = { ws, seat: data.seat };
       $("coop-code").textContent = data.code;
       $("coop-wait").textContent = data.seat === 0 ? "Ждём друга. Пусть введёт этот код." : "Входим в уровень…";
     }
-    if (data.t === "snap") {
-      game.feedCoop(data);
-      if (game.state === "play") ui.showPlay();
+    if (data.t === "go") {
+      game.coop = { ...(game.coop || {}), ws, seat: data.seat };
+      game.beginCoop(data);
+    } else if (data.t === "in" || data.t === "pick" || data.t === "reroll" || data.t === "continue" || data.t === "endless" || data.t === "exit") {
+      game.onCoop(data);
     }
   };
   ws.onerror = () => ui.toast("Нет связи с комнатой");
@@ -403,8 +405,20 @@ $("btn-coop").onclick = () => {
 };
 $("btn-coop-back").onclick = () => showMenu();
 $("btn-coop-host").onclick = () => {
-  const level = profile?.clearedLevels?.length ? Math.min(3, profile.clearedLevels.length) : 1;
-  coopSocket({ t: "host", level: levelOpen(1) ? 1 : 1 });
+  game.resize();
+  const p = profile || {};
+  coopSocket({
+    t: "host",
+    level: 1,
+    worldW: game.worldW,
+    worldH: game.worldH,
+    profile: {
+      hangar: p.hangar || {},
+      critBonus: p.critBonus || 0,
+      weapons: p.weapons || [],
+      fourthCard: !!p.fourthCard,
+    },
+  });
 };
 $("btn-coop-join").onclick = () => {
   const code = $("coop-join-code").value.trim().toUpperCase();
