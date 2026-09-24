@@ -353,7 +353,8 @@ function beginBattle(level = 1) {
   audio.unlock();
   game.meta = meta;
   game.profile = profile;
-  Promise.resolve(game.startRemote(level)).catch((error) => ui.toast(error.message || "Бой не запустился"));
+  game.remote = false;
+  Promise.resolve(game.startRun(level)).catch((error) => ui.toast(error.message || "Бой не запустился"));
 }
 
 $("btn-play").onclick = () => {
