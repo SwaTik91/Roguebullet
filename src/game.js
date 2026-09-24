@@ -12,6 +12,7 @@ const gatling = typeof Image === "undefined" ? null : new Image();
 if (gatling) gatling.src = "/gatling.png";
 
 const LEVELS = 3;
+const OFFER_XP_MULT = 5;
 
 const PART_DROP_RARITY = {
   common: "обычная",
@@ -414,7 +415,7 @@ export class Game {
     else this.run.kills[bucket] += 1;
     this.run.coins += e.coins;
     this.run.xp += e.xp;
-    this.gainOfferXp(1);
+    this.gainOfferXp(OFFER_XP_MULT);
     this.audio.hit();
     this.burst(e.x, e.y, e.color, e.boss ? 28 : 12);
     this.shake = Math.max(this.shake, e.boss ? 10 : 3);
