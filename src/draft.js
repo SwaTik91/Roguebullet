@@ -143,6 +143,10 @@ function secondaryUpgrades(id) {
   }
 }
 
+function tag(cards, who) {
+  return cards.map((c) => ({ ...c, who }));
+}
+
 function withoutOnce(cards, host) {
   return cards.filter((c) => !(c.once && host && host[c.once]));
 }
@@ -155,23 +159,23 @@ function unlockCard(spec) {
 }
 
 export function battlePool(run) {
-  const cards = [...GENERAL];
+  const cards = tag(GENERAL, "Общая карта");
   const weapons = run.weapons || {};
 
-  cards.push(...withoutOnce(gunPool(run.gun?.branch), run.gun));
-  if (run.gun && run.gun.branch == null) cards.push(...GUN_BRANCHES);
+  cards.push(...tag(withoutOnce(gunPool(run.gun?.branch), run.gun), "Пулемёт"));
+  if (run.gun && run.gun.branch == null) cards.push(...tag(GUN_BRANCHES, "Пулемёт"));
 
   if (weapons.drone && run.drone) {
-    cards.push(...withoutOnce(dronePool(run.drone.branch), run.drone));
-    if (run.drone.branch == null) cards.push(...DRONE_BRANCHES);
+    cards.push(...tag(withoutOnce(dronePool(run.drone.branch), run.drone), "Дрон"));
+    if (run.drone.branch == null) cards.push(...tag(DRONE_BRANCHES, "Дрон"));
   }
 
   for (const spec of UNLOCKS) {
     if (!weapons[spec.id]) {
-      cards.push(unlockCard(spec));
+      cards.push({ ...unlockCard(spec), who: spec.title });
       continue;
     }
-    if (spec.id !== "drone") cards.push(...secondaryUpgrades(spec.id));
+    if (spec.id !== "drone") cards.push(...tag(secondaryUpgrades(spec.id), spec.title));
   }
 
   return cards;

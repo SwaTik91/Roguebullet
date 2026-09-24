@@ -80,6 +80,8 @@ test("Пластины increases hp", () => {
   const r = run();
   const plates = battlePool(r).find((c) => c.title === "Пластины");
   assert.ok(plates);
+  assert.equal(plates.who, "Общая карта");
+  assert.equal(battlePool(r).find((c) => c.id === "cal").who, "Пулемёт");
   plates.apply(r);
   assert.equal(r.tower.hp, 300);
   assert.equal(r.tower.maxHp, 300);

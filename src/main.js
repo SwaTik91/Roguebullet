@@ -57,7 +57,7 @@ const ui = {
       const btn = document.createElement("button");
       btn.className = `card ${card.rarity}`;
       const labels = { legendary: "ЛЕГЕНДАРКА", epic: "ЭПИК", rare: "РЕДКАЯ", common: "ОБЫЧНАЯ" };
-      btn.innerHTML = `<small>${labels[card.rarity] || "ОБЫЧНАЯ"}</small><strong>${card.title}</strong><p>${card.desc}</p>`;
+      btn.innerHTML = `<span class="card-top"><small>${labels[card.rarity] || "ОБЫЧНАЯ"}</small><em>${card.who || "Общая карта"}</em></span><strong>${card.title}</strong><p>${card.desc}</p>`;
       btn.onclick = () => game.applyCard(card);
       $("card-row").appendChild(btn);
     });

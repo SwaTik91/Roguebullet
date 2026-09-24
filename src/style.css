@@ -320,6 +320,21 @@ h2 {
   border-color: rgba(255, 179, 71, 0.55);
 }
 
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-top em {
+  font-style: normal;
+  color: var(--cyan);
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  text-align: right;
+}
+
 .card small {
   color: var(--muted);
   letter-spacing: 0.1em;
