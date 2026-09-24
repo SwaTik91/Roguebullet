@@ -196,23 +196,33 @@ export function battlePool(run) {
   return cards;
 }
 
+function pickWeighted(cards, rng) {
+  const sum = cards.reduce((acc, c) => acc + (RARITY_WEIGHT[c.rarity] || 1), 0);
+  let roll = rng() * sum;
+  let picked = cards[0];
+  for (const c of cards) {
+    roll -= RARITY_WEIGHT[c.rarity] || 1;
+    if (roll <= 0) return c;
+  }
+  return picked;
+}
+
+const HOME = new Set(["Пулемёт", "Дрон", "Общая карта"]);
+
 export function rollBattleOffer(run, n = 3, rng = Math.random) {
   const pool = battlePool(run);
   const out = [];
   const used = new Set();
+  const featured = pool.filter((c) => !HOME.has(c.who));
+  if (featured.length && n > 0) {
+    const picked = pickWeighted(featured, rng);
+    used.add(picked.id);
+    out.push(picked);
+  }
   while (out.length < n) {
     const available = pool.filter((c) => !used.has(c.id));
     if (!available.length) break;
-    const sum = available.reduce((acc, c) => acc + (RARITY_WEIGHT[c.rarity] || 1), 0);
-    let roll = rng() * sum;
-    let picked = available[0];
-    for (const c of available) {
-      roll -= RARITY_WEIGHT[c.rarity] || 1;
-      if (roll <= 0) {
-        picked = c;
-        break;
-      }
-    }
+    const picked = pickWeighted(available, rng);
     used.add(picked.id);
     out.push(picked);
   }

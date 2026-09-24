@@ -49,6 +49,14 @@ function lcg(seed) {
   };
 }
 
+test("every offer includes a weapon other than the gun and the drone", () => {
+  for (let i = 0; i < 40; i++) {
+    const cards = rollBattleOffer(run(), 3, Math.random);
+    assert.equal(cards.length, 3);
+    assert.ok(cards.some((c) => !["Пулемёт", "Дрон", "Общая карта"].includes(c.who)));
+  }
+});
+
 test("offer length is 3 and ids are unique", () => {
   const cards = rollBattleOffer(run());
   assert.equal(cards.length, 3);
@@ -93,6 +101,7 @@ test("common cards outweigh rare cards, which outweigh epics", () => {
   const rng = lcg(11);
   for (let i = 0; i < 150; i++) {
     for (const card of rollBattleOffer(run(), 3, rng)) {
+      if (card.unlock) continue;
       if (card.rarity in counts) counts[card.rarity] += 1;
     }
   }
