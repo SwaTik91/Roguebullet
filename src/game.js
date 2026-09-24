@@ -132,7 +132,7 @@ export class Game {
       wepStats: {},
       drones: [],
       drone: {
-        dmg: 16,
+        dmg: 22,
         count: 1,
         cd: 0.26,
         bombs: false,
