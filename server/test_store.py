@@ -79,7 +79,7 @@ class StoreTests(unittest.TestCase):
         later = self.store.buy_reroll(token, "run-1", 16)
         self.assertEqual(later["price"]["kind"], "free")
 
-    def test_level_roll_miss_is_idempotent(self):
+    def test_endless_roll_miss_is_idempotent(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         dry = lambda: 0.9
 
@@ -93,14 +93,14 @@ class StoreTests(unittest.TestCase):
                 "affixes": [],
             }
 
-        first = self.store.roll_part(token, "run-miss", "level", 1, None, dry, roller=roller)
+        first = self.store.roll_part(token, "run-miss", "endless", None, 5, dry, roller=roller)
         self.assertIsNone(first["part"])
-        self.assertEqual(first["profile"]["partsDry"], 1)
+        self.assertEqual(first["profile"]["partsDry"], 0)
         self.assertEqual(first["profile"]["parts"], [])
 
-        second = self.store.roll_part(token, "run-miss", "level", 1, None, dry, roller=roller)
+        second = self.store.roll_part(token, "run-miss", "endless", None, 5, dry, roller=roller)
         self.assertIsNone(second["part"])
-        self.assertEqual(second["profile"]["partsDry"], 1)
+        self.assertEqual(second["profile"]["partsDry"], 0)
         self.assertEqual(second["profile"]["parts"], [])
 
     def test_parts_roll_dry_equip(self):
@@ -144,15 +144,10 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(again["part"]["id"], "p1")
         self.assertEqual(len(again["profile"]["parts"]), 1)
 
-        for level in range(2, 7):
-            out = self.store.roll_part(token, "run-a", "level", level, None, dry, roller=roller)
-            self.assertIsNone(out["part"])
-        self.assertEqual(self.store.account_for_token(token)["partsDry"], 5)
-
-        sixth = self.store.roll_part(token, "run-a", "level", 7, None, dry, roller=roller)
-        self.assertIsNotNone(sixth["part"])
-        self.assertEqual(sixth["part"]["id"], "p2")
-        self.assertEqual(sixth["profile"]["partsDry"], 0)
+        second = self.store.roll_part(token, "run-a", "level", 2, None, dry, roller=roller)
+        self.assertIsNotNone(second["part"])
+        self.assertEqual(second["part"]["id"], "p2")
+        self.assertEqual(second["profile"]["partsDry"], 0)
 
         no_drop = self.store.roll_part(token, "run-b", "endless", None, 4, lucky, roller=roller)
         self.assertIsNone(no_drop["part"])

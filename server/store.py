@@ -29,9 +29,7 @@ from server.rewards import (
 HANGAR_KEYS = {"atk": "hangar_atk", "hp": "hangar_hp", "charge": "hangar_charge"}
 MOSCOW = ZoneInfo("Europe/Moscow")
 DEFAULT_LOADOUT_JSON = "[null,null,null,null,null,null,null,null]"
-LEVEL_PART_CHANCE = 0.45
 ENDLESS_PART_CHANCE = 0.30
-PARTS_DRY_GUARANTEE = 5
 
 
 def moscow_day(now):
@@ -578,19 +576,9 @@ class Store:
                 self.db.commit()
                 return {"part": part, "profile": profile}
 
-            row = self.db.execute("SELECT parts_dry FROM accounts WHERE id = ?", (account_id,)).fetchone()
-            parts_dry = int(row["parts_dry"] or 0)
             drop = False
             if kind == "level":
-                if parts_dry >= PARTS_DRY_GUARANTEE:
-                    drop = True
-                elif rng() < LEVEL_PART_CHANCE:
-                    drop = True
-                else:
-                    self._record_roll_miss(account_id, roll_key, kind="level")
-                    profile = self._profile(account_id)
-                    self.db.commit()
-                    return {"part": None, "profile": profile}
+                drop = True
             elif rng() < ENDLESS_PART_CHANCE:
                 drop = True
             else:
