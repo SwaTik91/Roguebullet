@@ -8,6 +8,7 @@ import {
   sumBonuses,
   applyBonuses,
 } from "../src/parts.js";
+import { Game } from "../src/game.js";
 
 function rngFrom(values) {
   let i = 0;
@@ -216,4 +217,41 @@ test("applyBonuses caps emp radius and slow duration and floors slow multiplier"
 test("unequip clears slot", () => {
   const slots = ["a", null, null, null, null, null, null, null];
   assert.deepEqual(unequip(slots, 0), [null, null, null, null, null, null, null, null]);
+});
+
+test("startRun applies equipped part bonuses to the run", async () => {
+  const ui = {
+    showPlay() {},
+    updateHud() {},
+    setCombo() {},
+    toast() {},
+    hideCards() {},
+    showCards() {},
+    save() {},
+  };
+  const audio = new Proxy({}, { get: () => () => {} });
+  const game = new Game(null, ui, audio, { bestWave: 0 }, { headless: true });
+  const equippedGun = {
+    id: "g1",
+    base: "barrel",
+    baseName: "Ствол",
+    family: "gun",
+    rarity: "legendary",
+    affixes: [{ id: "dmg", name: "урон", step: 4 }],
+  };
+  const unequippedHp = {
+    id: "h1",
+    base: "core",
+    baseName: "Ядро",
+    family: null,
+    rarity: "legendary",
+    affixes: [{ id: "hp", name: "здоровье ядра", step: 4 }],
+  };
+  game.profile = {
+    parts: [equippedGun, unequippedHp],
+    loadout: ["g1", null, null, null, null, null, null, null],
+  };
+  await game.startRun(1);
+  assert.equal(game.run.gun.dmg, 17 * 1.16);
+  assert.equal(game.run.tower.maxHp, 220);
 });

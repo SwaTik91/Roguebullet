@@ -4,6 +4,7 @@ import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } fr
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
 import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
+import { sumBonuses, applyBonuses } from "./parts.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const gatling = typeof Image === "undefined" ? null : new Image();
@@ -211,6 +212,7 @@ export class Game {
       won: false,
       usedCard: false,
     };
+    applyBonuses(this.run, sumBonuses(profile.parts || [], profile.loadout || []));
     this.state = "play";
     this.ui.showPlay();
     this.syncDrones();
