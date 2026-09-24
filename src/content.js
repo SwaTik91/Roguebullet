@@ -148,6 +148,10 @@ export function pickCards(run, n = 3) {
   return out;
 }
 
+export function endlessEnemyWave(wave) {
+  return ((wave - 1) % 5) + 1;
+}
+
 export function enemyForWave(wave, chapter, power = 1) {
   const scale = Math.pow(1.32, wave - 1) * (1 + (chapter - 1) * 0.42) * power;
   const table = [

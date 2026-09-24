@@ -1,4 +1,4 @@
-import { SHAPES, WEAPON_INFO, enemyForWave, waveCount } from "./content.js";
+import { SHAPES, WEAPON_INFO, endlessEnemyWave, enemyForWave, waveCount } from "./content.js";
 import { rayEnd, reflectAngle } from "./laser.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
@@ -209,7 +209,8 @@ export class Game {
     }
     const n = this.run.endless ? 1000 : waveCount(wave);
     const power = this.run.power || 1;
-    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(Math.min(wave, 6), chapter, power));
+    const kind = this.run.endless ? endlessEnemyWave(wave) : wave;
+    for (let i = 0; i < n; i++) this.run.spawnQueue.push(enemyForWave(kind, chapter, power));
     this.run.spawnTimer = 0.45;
     this.ui.updateHud(this.run);
   }
