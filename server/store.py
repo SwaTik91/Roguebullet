@@ -572,7 +572,8 @@ class Store:
                 (account_id, roll_key),
             ).fetchone()
             if existing:
-                part = self._part_by_id(account_id, existing["part_id"])
+                part_id = existing["part_id"]
+                part = self._part_by_id(account_id, part_id) if part_id else None
                 profile = self._profile(account_id)
                 self.db.commit()
                 return {"part": part, "profile": profile}
@@ -586,21 +587,14 @@ class Store:
                 elif rng() < LEVEL_PART_CHANCE:
                     drop = True
                 else:
-                    self.db.execute(
-                        "UPDATE accounts SET parts_dry = parts_dry + 1 WHERE id = ?",
-                        (account_id,),
-                    )
+                    self._record_roll_miss(account_id, roll_key, kind="level")
                     profile = self._profile(account_id)
                     self.db.commit()
                     return {"part": None, "profile": profile}
             elif rng() < ENDLESS_PART_CHANCE:
                 drop = True
             else:
-                profile = self._profile(account_id)
-                self.db.commit()
-                return {"part": None, "profile": profile}
-
-            if not drop:
+                self._record_roll_miss(account_id, roll_key, kind="endless")
                 profile = self._profile(account_id)
                 self.db.commit()
                 return {"part": None, "profile": profile}
@@ -796,6 +790,17 @@ class Store:
             "rarity": row["rarity"],
             "affixes": json.loads(row["affixes_json"] or "[]"),
         }
+
+    def _record_roll_miss(self, account_id, roll_key, kind):
+        self.db.execute(
+            "INSERT INTO part_rolls (account_id, roll_key, part_id) VALUES (?, ?, ?)",
+            (account_id, roll_key, ""),
+        )
+        if kind == "level":
+            self.db.execute(
+                "UPDATE accounts SET parts_dry = parts_dry + 1 WHERE id = ?",
+                (account_id,),
+            )
 
     def _insert_part(self, account_id, part):
         self.db.execute(

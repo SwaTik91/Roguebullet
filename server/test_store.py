@@ -79,6 +79,30 @@ class StoreTests(unittest.TestCase):
         later = self.store.buy_reroll(token, "run-1", 16)
         self.assertEqual(later["price"]["kind"], "free")
 
+    def test_level_roll_miss_is_idempotent(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        dry = lambda: 0.9
+
+        def roller(_rng, _owned):
+            return {
+                "id": "should-not-drop",
+                "base": "barrel",
+                "baseName": "Ствол",
+                "family": "gun",
+                "rarity": "common",
+                "affixes": [],
+            }
+
+        first = self.store.roll_part(token, "run-miss", "level", 1, None, dry, roller=roller)
+        self.assertIsNone(first["part"])
+        self.assertEqual(first["profile"]["partsDry"], 1)
+        self.assertEqual(first["profile"]["parts"], [])
+
+        second = self.store.roll_part(token, "run-miss", "level", 1, None, dry, roller=roller)
+        self.assertIsNone(second["part"])
+        self.assertEqual(second["profile"]["partsDry"], 1)
+        self.assertEqual(second["profile"]["parts"], [])
+
     def test_parts_roll_dry_equip(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         profile = self.store.account_for_token(token)
