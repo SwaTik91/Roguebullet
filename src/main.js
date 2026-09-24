@@ -274,8 +274,13 @@ function renderHangar() {
 
 function partBlock(part) {
   const affixLines = (part.affixes || [])
-    .map((affix) => describeAffix(part.family, affix))
-    .map((line) => `<div class="sub">${line}</div>`)
+    .map((affix) => {
+      const line = describeAffix(part.family, affix);
+      const split = line.indexOf(": ");
+      const name = split >= 0 ? line.slice(0, split) : line;
+      const value = split >= 0 ? line.slice(split + 2) : "";
+      return `<div class="part-affix"><span>${name}</span><b>${value}</b></div>`;
+    })
     .join("");
   const rarity = part.rarity || "common";
   return `<strong>${part.baseName || part.base}</strong><div class="sub rarity-${rarity}">${PART_RARITY_LABELS[rarity] || rarity}</div>${affixLines}`;
@@ -287,14 +292,14 @@ function renderParts() {
   const byId = new Map(parts.map((p) => [p.id, p]));
   const equipped = new Set(loadout.filter(Boolean));
 
-  $("parts-slots").innerHTML = loadout
+  const slotHtml = loadout
     .map((id, index) => {
       const occupied = Boolean(id);
       const part = occupied ? byId.get(id) : null;
       const label = !occupied ? '<span class="sub">Пусто</span>' : part ? partBlock(part) : '<span class="sub">Занято</span>';
       return `<button type="button" class="part-slot${occupied ? "" : " empty"}" data-slot="${index}" ${occupied ? "" : "disabled"}>${label}</button>`;
-    })
-    .join("");
+    });
+  $("parts-slots").innerHTML = `<p class="sub part-group">Оружейные</p>${slotHtml.slice(0, 4).join("")}<p class="sub part-group">Общие</p>${slotHtml.slice(4).join("")}`;
 
   $("parts-slots").querySelectorAll("button[data-slot]:not([disabled])").forEach((btn) => {
     btn.onclick = () =>

@@ -490,21 +490,39 @@ h2 {
 
 .parts-grid {
   width: min(420px, 100%);
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin: 16px 0;
+}
+
+.part-group {
+  margin: 8px 0 0;
 }
 
 .part-slot {
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 14px;
-  padding: 10px;
-  min-height: 88px;
+  padding: 12px 14px;
   text-align: left;
   color: var(--text);
   font: inherit;
+  width: 100%;
+}
+
+.part-affix {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  color: var(--muted, #9aa4bd);
+}
+
+.part-affix b {
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .part-slot.empty {
