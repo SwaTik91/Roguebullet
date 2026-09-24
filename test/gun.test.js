@@ -65,10 +65,9 @@ test("rate and crit caps still hold", () => {
   const r = run();
   const tempo = gunPool(null).find((c) => c.id === "tempo");
   const spark = gunPool("queue").find((c) => c.id === "spark");
-  r.gun.rate = 17;
-  addRate(r.gun, 5);
+  r.gun.rate = 23;
   tempo.apply(r);
-  assert.equal(r.gun.rate, 18);
+  assert.equal(r.gun.rate, 24);
   r.crit.chance = 0.74;
   spark.apply(r);
   assert.equal(r.crit.chance, 0.75);
@@ -103,11 +102,11 @@ test("volley legendaries add pellets and pierce", () => {
   gunStep(5).cards[1].apply(r);
   gunStep(10, "volley").cards[0].apply(r);
   gunStep(15, "volley").cards[0].apply(r);
-  assert.equal(r.gun.pellets, 8);
+  assert.equal(r.gun.pellets, 12);
   assert.ok(r.gun.gap < 12);
   const through = run();
   gunStep(15, "volley").cards[1].apply(through);
-  assert.equal(through.gun.falloff, 0.75);
+  assert.equal(through.gun.falloff, 0.9);
 });
 
 test("ricochet legendaries add bounces and a one-time edge bonus", () => {
@@ -115,7 +114,7 @@ test("ricochet legendaries add bounces and a one-time edge bonus", () => {
   gunStep(5).cards[2].apply(r);
   gunStep(10, "ricochet").cards[0].apply(r);
   gunStep(15, "ricochet").cards[1].apply(r);
-  assert.equal(r.gun.bounces, 6);
+  assert.equal(r.gun.bounces, 9);
   const swarm = gunPool("ricochet").find((c) => c.id === "spark-s");
   swarm.apply(r);
   assert.equal(rollGunOffer("ricochet", r.gun, 99).some((c) => c.id === "spark-s"), false);

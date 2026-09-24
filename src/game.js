@@ -127,7 +127,7 @@ export class Game {
       orbAngle: 0,
       gun: {
         angle: -Math.PI / 2,
-        dmg: 9 * atk,
+        dmg: 14 * atk,
         rate: 8,
         pellets: 1,
         pierce: 0,
@@ -465,7 +465,7 @@ export class Game {
       y: b.y + ny * sign * 12,
       vx: nx * sign * 480,
       vy: ny * sign * 480,
-      dmg: b.dmg * 0.5,
+      dmg: b.dmg * 0.8,
       r: 3,
       pierce: 0,
       falloff: 0,
