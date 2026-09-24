@@ -5,6 +5,7 @@ import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { META_UPGRADES } from "./content.js";
 import { api, newId } from "./api.js";
 import { nextSpeed, speedLabel } from "./speed.js";
+import { rerollLabel, rerollPrice } from "./reroll.js";
 import { retryPendingClaims } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
@@ -48,12 +49,17 @@ const ui = {
     el.classList.remove("hidden");
     $("combo-text").textContent = `${names[run.comboType] || "●"} × ${run.combo}`;
   },
-  showCards(cards, heading) {
+  showCards(cards, heading, used = 0) {
     $("screen-cards").classList.remove("hidden");
     if (heading) {
       $("cards-title").textContent = heading.title;
       $("cards-sub").textContent = heading.sub;
     }
+    const price = rerollPrice(used);
+    const reroll = $("btn-reroll");
+    reroll.textContent = rerollLabel(price);
+    reroll.disabled = !price;
+    reroll.dataset.used = String(used);
     $("card-row").innerHTML = "";
     cards.forEach((card) => {
       const btn = document.createElement("button");
@@ -434,6 +440,17 @@ $("btn-how-back").onclick = () => {
   ui.save();
   hideAll();
   $("screen-menu").classList.remove("hidden");
+};
+$("btn-reroll").onclick = async () => {
+  const btn = $("btn-reroll");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    await game.rerollCards(Number(btn.dataset.used) || 0);
+  } catch (err) {
+    ui.toast(err.message || "Реролл не прошёл");
+    btn.disabled = false;
+  }
 };
 $("btn-speed").onclick = () => {
   game.speed = nextSpeed(game.speed || 1);

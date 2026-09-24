@@ -430,6 +430,13 @@ export class Game {
     this.gainOfferXp(0);
   }
 
+  async rerollCards() {
+    const result = await api.buyReroll(this.run.runId, this.run.offer.level);
+    if (result.profile) this.ui.applyProfile?.(result.profile);
+    this.ui.showCards(rollBattleOffer(this.run), null, result.used);
+    this.audio.pickup();
+  }
+
   syncDrones() {
     const need = this.run.drone?.count || this.run.wepStats.drone?.count || 0;
     while (this.run.drones.length < need) {

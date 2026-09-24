@@ -61,6 +61,22 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.claim_endless(token, 0, 1)
 
+    def test_reroll_charges_the_ladder_once_per_offer(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        self.store.db.execute("UPDATE accounts SET coins = 1000, crystals = 1")
+        self.store.db.commit()
+        first = self.store.buy_reroll(token, "run-1", 2)
+        second = self.store.buy_reroll(token, "run-1", 2)
+        self.assertEqual(first["price"]["kind"], "free")
+        self.assertEqual(second["price"]["kind"], "free")
+        third = self.store.buy_reroll(token, "run-1", 2)
+        self.assertEqual(third["price"], {"kind": "coins", "amount": 1000})
+        self.assertEqual(third["profile"]["coins"], 0)
+        with self.assertRaises(ValueError):
+            self.store.buy_reroll(token, "run-1", 2)
+        other = self.store.buy_reroll(token, "run-1", 3)
+        self.assertEqual(other["price"]["kind"], "free")
+
 
 class HandlerTests(unittest.TestCase):
     def test_register_then_me(self):

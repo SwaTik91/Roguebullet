@@ -6,6 +6,7 @@ from server.rewards import (
     coin_reward,
     daily_tasks,
     endless_crystals,
+    reroll_price,
     first_clear_crystals,
     hangar_price,
     validate_endless,
@@ -16,6 +17,12 @@ from server.rewards import (
 
 
 class RewardTests(unittest.TestCase):
+    def test_reroll_ladder_is_free_then_coins_then_crystals(self):
+        self.assertEqual(reroll_price(0), {"kind": "free", "amount": 0})
+        self.assertEqual(reroll_price(1)["kind"], "free")
+        self.assertEqual([reroll_price(i)["amount"] for i in range(2, 7)], [1000, 2000, 3000, 4000, 5000])
+        self.assertEqual([reroll_price(i)["amount"] for i in range(7, 14)], [1, 2, 3, 4, 5, 10, 20])
+        self.assertIsNone(reroll_price(14))
     def test_coins_add_kill_table_progress_and_win_bonus(self):
         kills = {"circle": 2, "triangle": 0, "square": 1, "hex": 0, "diamond": 0, "split": 1, "boss": 1}
         self.assertEqual(coin_reward(kills, 3, 6, True), 2 * 2 + 3 + 1 + 28 + 12 + 6 + 40)

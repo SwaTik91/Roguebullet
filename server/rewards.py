@@ -126,6 +126,25 @@ def validate_endless(level, wave):
     return level, wave
 
 
+REROLL_COINS = (1000, 2000, 3000, 4000, 5000)
+REROLL_CRYSTALS = (1, 2, 3, 4, 5, 10, 20)
+
+
+def reroll_price(used):
+    used = int(used)
+    if used < 0:
+        raise ValueError("Некорректный реролл")
+    if used < 2:
+        return {"kind": "free", "amount": 0}
+    coin_index = used - 2
+    if coin_index < len(REROLL_COINS):
+        return {"kind": "coins", "amount": REROLL_COINS[coin_index]}
+    crystal_index = coin_index - len(REROLL_COINS)
+    if crystal_index < len(REROLL_CRYSTALS):
+        return {"kind": "crystals", "amount": REROLL_CRYSTALS[crystal_index]}
+    return None
+
+
 def endless_crystals(level, wave):
     validate_endless(level, wave)
     return 5

@@ -16,6 +16,7 @@ from server.rewards import (
     coin_reward,
     daily_tasks,
     endless_crystals,
+    reroll_price,
     first_clear_crystals,
     hangar_price,
     ready_achievements,
@@ -125,6 +126,13 @@ class Store:
                 level INTEGER NOT NULL,
                 wave INTEGER NOT NULL,
                 PRIMARY KEY (account_id, level, wave)
+            );
+            CREATE TABLE IF NOT EXISTS reroll_counts (
+                account_id INTEGER NOT NULL,
+                run_id TEXT NOT NULL,
+                offer_level INTEGER NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (account_id, run_id, offer_level)
             );
             """
         )
@@ -262,6 +270,53 @@ class Store:
             self.db.rollback()
             raise
         return {"granted": granted, "crystals": profile["crystals"], "profile": profile}
+
+    def buy_reroll(self, token, run_id, offer_level):
+        run_id = str(run_id or "").strip()
+        try:
+            offer_level = int(offer_level)
+        except (TypeError, ValueError):
+            raise ValueError("Некорректный реролл")
+        if not run_id or offer_level < 1 or offer_level > 15:
+            raise ValueError("Некорректный реролл")
+        account_id = self._account_row(token)["id"]
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute(
+                "SELECT used FROM reroll_counts WHERE account_id = ? AND run_id = ? AND offer_level = ?",
+                (account_id, run_id, offer_level),
+            ).fetchone()
+            used = int(row["used"]) if row else 0
+            price = reroll_price(used)
+            if price is None:
+                raise ValueError("Реролл больше недоступен")
+            account = self.db.execute("SELECT coins, crystals FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            if price["kind"] == "coins" and account["coins"] < price["amount"]:
+                raise ValueError("Не хватает монет")
+            if price["kind"] == "crystals" and account["crystals"] < price["amount"]:
+                raise ValueError("Не хватает кристаллов")
+            if price["kind"] == "coins":
+                self.db.execute("UPDATE accounts SET coins = coins - ? WHERE id = ?", (price["amount"], account_id))
+            elif price["kind"] == "crystals":
+                self.db.execute(
+                    "UPDATE accounts SET crystals = crystals - ? WHERE id = ?",
+                    (price["amount"], account_id),
+                )
+            used += 1
+            self.db.execute(
+                """
+                INSERT INTO reroll_counts (account_id, run_id, offer_level, used)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(account_id, run_id, offer_level) DO UPDATE SET used = excluded.used
+                """,
+                (account_id, run_id, offer_level, used),
+            )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"used": used, "price": price, "next": reroll_price(used), "profile": profile}
 
     def buy_hangar(self, token, key):
         if key not in HANGAR_KEYS:
