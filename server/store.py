@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from server import parts_bridge
 from server.rewards import (
     ACHIEVEMENT_CRYSTALS,
     CRIT_CAP,
@@ -27,6 +28,10 @@ from server.rewards import (
 
 HANGAR_KEYS = {"atk": "hangar_atk", "hp": "hangar_hp", "charge": "hangar_charge"}
 MOSCOW = ZoneInfo("Europe/Moscow")
+DEFAULT_LOADOUT_JSON = "[null,null,null,null,null,null,null,null]"
+LEVEL_PART_CHANCE = 0.45
+ENDLESS_PART_CHANCE = 0.30
+PARTS_DRY_GUARANTEE = 5
 
 
 def moscow_day(now):
@@ -65,7 +70,9 @@ class Store:
                 hangar_charge INTEGER NOT NULL DEFAULT 0,
                 hangar_buys INTEGER NOT NULL DEFAULT 0,
                 chests_opened INTEGER NOT NULL DEFAULT 0,
-                kills_total INTEGER NOT NULL DEFAULT 0
+                kills_total INTEGER NOT NULL DEFAULT 0,
+                loadout_json TEXT NOT NULL DEFAULT '[null,null,null,null,null,null,null,null]',
+                parts_dry INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS sessions (
                 token_hash TEXT PRIMARY KEY,
@@ -134,9 +141,31 @@ class Store:
                 used INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (account_id, run_id, offer_level)
             );
+            CREATE TABLE IF NOT EXISTS account_parts (
+                id TEXT PRIMARY KEY,
+                account_id INTEGER NOT NULL,
+                base TEXT NOT NULL,
+                base_name TEXT NOT NULL,
+                family TEXT,
+                rarity TEXT NOT NULL,
+                affixes_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS part_rolls (
+                account_id INTEGER NOT NULL,
+                roll_key TEXT NOT NULL,
+                part_id TEXT NOT NULL,
+                PRIMARY KEY (account_id, roll_key)
+            );
             """
         )
+        self._ensure_column("accounts", "loadout_json", f"TEXT NOT NULL DEFAULT '{DEFAULT_LOADOUT_JSON}'")
+        self._ensure_column("accounts", "parts_dry", "INTEGER NOT NULL DEFAULT 0")
         self.db.commit()
+
+    def _ensure_column(self, table, column, definition):
+        columns = {row[1] for row in self.db.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            self.db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def register(self, name, password):
         name = (name or "").strip()
@@ -511,6 +540,141 @@ class Store:
             raise
         return {"card": card, "profile": self._profile(account_id)}
 
+    def roll_part(self, token, run_id, kind, level, wave, rng, roller=None):
+        account_id = self._account_row(token)["id"]
+        run_id = str(run_id or "").strip()
+        kind = str(kind or "").strip()
+        if not run_id:
+            raise ValueError("Нет номера забега")
+        if kind not in ("level", "endless"):
+            raise ValueError("Некорректный бросок детали")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if kind == "endless":
+                try:
+                    wave_num = int(wave)
+                except (TypeError, ValueError):
+                    wave_num = 0
+                if wave_num <= 0 or wave_num % 5 != 0:
+                    profile = self._profile(account_id)
+                    self.db.commit()
+                    return {"part": None, "profile": profile}
+                roll_key = f"{run_id}:endless:{wave_num}"
+            else:
+                try:
+                    level_num = int(level)
+                except (TypeError, ValueError):
+                    raise ValueError("Некорректный бросок детали")
+                roll_key = f"{run_id}:level:{level_num}"
+
+            existing = self.db.execute(
+                "SELECT part_id FROM part_rolls WHERE account_id = ? AND roll_key = ?",
+                (account_id, roll_key),
+            ).fetchone()
+            if existing:
+                part = self._part_by_id(account_id, existing["part_id"])
+                profile = self._profile(account_id)
+                self.db.commit()
+                return {"part": part, "profile": profile}
+
+            row = self.db.execute("SELECT parts_dry FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            parts_dry = int(row["parts_dry"] or 0)
+            drop = False
+            if kind == "level":
+                if parts_dry >= PARTS_DRY_GUARANTEE:
+                    drop = True
+                elif rng() < LEVEL_PART_CHANCE:
+                    drop = True
+                else:
+                    self.db.execute(
+                        "UPDATE accounts SET parts_dry = parts_dry + 1 WHERE id = ?",
+                        (account_id,),
+                    )
+                    profile = self._profile(account_id)
+                    self.db.commit()
+                    return {"part": None, "profile": profile}
+            elif rng() < ENDLESS_PART_CHANCE:
+                drop = True
+            else:
+                profile = self._profile(account_id)
+                self.db.commit()
+                return {"part": None, "profile": profile}
+
+            if not drop:
+                profile = self._profile(account_id)
+                self.db.commit()
+                return {"part": None, "profile": profile}
+
+            owned = self._owned_weapon_families(account_id)
+            part_id = secrets.token_hex(16)
+            if roller is None:
+                part = parts_bridge.roll_part(rng, owned, part_id)
+            else:
+                part = roller(rng, owned)
+                if not part.get("id"):
+                    part = {**part, "id": part_id}
+            self._insert_part(account_id, part)
+            self.db.execute(
+                "INSERT INTO part_rolls (account_id, roll_key, part_id) VALUES (?, ?, ?)",
+                (account_id, roll_key, part["id"]),
+            )
+            if kind == "level":
+                self.db.execute("UPDATE accounts SET parts_dry = 0 WHERE id = ?", (account_id,))
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"part": part, "profile": profile}
+
+    def equip_part(self, token, part_id):
+        part_id = str(part_id or "").strip()
+        if not part_id:
+            raise ValueError("Нет детали")
+        account_id = self._account_row(token)["id"]
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if self._part_by_id(account_id, part_id) is None:
+                raise ValueError("Нет детали")
+            parts = self._parts_list(account_id)
+            row = self.db.execute("SELECT loadout_json FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            slots = json.loads(row["loadout_json"] or DEFAULT_LOADOUT_JSON)
+            result = parts_bridge.first_slot(parts, slots, part_id)
+            if result.get("error"):
+                raise ValueError(result["error"])
+            self.db.execute(
+                "UPDATE accounts SET loadout_json = ? WHERE id = ?",
+                (json.dumps(result["slots"], ensure_ascii=False), account_id),
+            )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"profile": profile}
+
+    def unequip_part(self, token, slot):
+        try:
+            index = int(slot)
+        except (TypeError, ValueError):
+            raise ValueError("Некорректный слот")
+        account_id = self._account_row(token)["id"]
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute("SELECT loadout_json FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            slots = json.loads(row["loadout_json"] or DEFAULT_LOADOUT_JSON)
+            next_slots = parts_bridge.unequip_slots(slots, index)
+            self.db.execute(
+                "UPDATE accounts SET loadout_json = ? WHERE id = ?",
+                (json.dumps(next_slots, ensure_ascii=False), account_id),
+            )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"profile": profile}
+
     def _new_session(self, account_id):
         token = secrets.token_hex(32)
         expires = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
@@ -588,7 +752,74 @@ class Store:
                 daily["level_clear"],
                 json.loads(daily["claimed_json"]),
             ),
+            "parts": self._parts_list(account_id),
+            "loadout": json.loads(row["loadout_json"] or DEFAULT_LOADOUT_JSON),
+            "partsDry": int(row["parts_dry"] or 0),
         }
+
+    def _parts_list(self, account_id):
+        items = []
+        for item in self.db.execute(
+            """
+            SELECT id, base, base_name, family, rarity, affixes_json
+            FROM account_parts WHERE account_id = ? ORDER BY id
+            """,
+            (account_id,),
+        ):
+            items.append(
+                {
+                    "id": item["id"],
+                    "base": item["base"],
+                    "baseName": item["base_name"],
+                    "family": item["family"],
+                    "rarity": item["rarity"],
+                    "affixes": json.loads(item["affixes_json"] or "[]"),
+                }
+            )
+        return items
+
+    def _part_by_id(self, account_id, part_id):
+        row = self.db.execute(
+            """
+            SELECT id, base, base_name, family, rarity, affixes_json
+            FROM account_parts WHERE account_id = ? AND id = ?
+            """,
+            (account_id, part_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "base": row["base"],
+            "baseName": row["base_name"],
+            "family": row["family"],
+            "rarity": row["rarity"],
+            "affixes": json.loads(row["affixes_json"] or "[]"),
+        }
+
+    def _insert_part(self, account_id, part):
+        self.db.execute(
+            """
+            INSERT INTO account_parts (id, account_id, base, base_name, family, rarity, affixes_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                part["id"],
+                account_id,
+                part["base"],
+                part.get("baseName") or part.get("base_name") or "",
+                part.get("family"),
+                part["rarity"],
+                json.dumps(part.get("affixes") or [], ensure_ascii=False),
+            ),
+        )
+
+    def _owned_weapon_families(self, account_id):
+        owned = {"gun", "drone"}
+        for item in self._weapons(account_id):
+            if item not in owned:
+                owned.add(item)
+        return sorted(owned)
 
     def _weapons(self, account_id):
         return [

@@ -66,6 +66,28 @@ def make_handler(store, battles=None):
                 body = self._body()
                 self._send_json(200, store.open_chest(self._token(), random.SystemRandom(), body.get("requestId")))
                 return
+            if method == "POST" and path == "/parts/roll":
+                body = self._body()
+                self._send_json(
+                    200,
+                    store.roll_part(
+                        self._token(),
+                        body.get("runId"),
+                        body.get("kind"),
+                        body.get("level"),
+                        body.get("wave"),
+                        random.random,
+                    ),
+                )
+                return
+            if method == "POST" and path == "/parts/equip":
+                body = self._body()
+                self._send_json(200, store.equip_part(self._token(), body.get("partId")))
+                return
+            if method == "POST" and path == "/parts/unequip":
+                body = self._body()
+                self._send_json(200, store.unequip_part(self._token(), body.get("slot")))
+                return
             if method == "POST" and path == "/battle/start":
                 body = self._body()
                 token = self._token()
