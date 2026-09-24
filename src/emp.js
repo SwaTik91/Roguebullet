@@ -94,12 +94,12 @@ export function empStep(level, branch) {
           r.wepStats.emp.slowMul = 0.12;
           r.wepStats.emp.slowDur = (r.wepStats.emp.slowDur || 1.15) * 2;
         }),
-        card("storm", "Разряд", "Урон ×2, импульс бьёт дважды", (r) => {
+        card("storm", "Разряд", "Урон +50%, импульс бьёт дважды", (r) => {
           r.wepStats.emp.branch = "storm";
           r.wepStats.emp.dmg *= 1.5;
           r.wepStats.emp.hits = 2;
         }),
-        card("dome", "Купол", "Радиус ×2, врагов отталкивает от ядра", (r) => {
+        card("dome", "Купол", "Радиус +55%, врагов отталкивает от ядра", (r) => {
           r.wepStats.emp.branch = "dome";
           r.wepStats.emp.radius *= 1.55;
           r.wepStats.emp.knock = 90;
