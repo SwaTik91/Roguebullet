@@ -277,7 +277,7 @@ class Store:
             offer_level = int(offer_level)
         except (TypeError, ValueError):
             raise ValueError("Некорректный реролл")
-        if not run_id or offer_level < 1 or offer_level > 15:
+        if not run_id or offer_level < 1:
             raise ValueError("Некорректный реролл")
         account_id = self._account_row(token)["id"]
         self.db.execute("BEGIN IMMEDIATE")

@@ -76,6 +76,8 @@ class StoreTests(unittest.TestCase):
             self.store.buy_reroll(token, "run-1", 2)
         other = self.store.buy_reroll(token, "run-1", 3)
         self.assertEqual(other["price"]["kind"], "free")
+        later = self.store.buy_reroll(token, "run-1", 16)
+        self.assertEqual(later["price"]["kind"], "free")
 
 
 class HandlerTests(unittest.TestCase):
