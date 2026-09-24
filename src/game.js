@@ -19,9 +19,13 @@ const normAng = (a) => {
 };
 
 export class Game {
-  constructor(canvas, ui, audio, meta) {
+  constructor(canvas, ui, audio, meta, options = {}) {
+    this.headless = !!options.headless;
+    this.remote = false;
+    this.remoteAction = null;
+    this.syncing = false;
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.ctx = this.headless ? null : canvas.getContext("2d");
     this.ui = ui;
     this.audio = audio;
     this.meta = meta;
@@ -29,13 +33,15 @@ export class Game {
     this.scale = 1;
     this.ox = 0;
     this.oy = 0;
-    this.worldW = 720;
-    this.worldH = 1280;
+    this.worldW = options.worldW || 720;
+    this.worldH = options.worldH || 1280;
     this.stars = [];
     this.pointer = { down: false, x: 360, y: 200 };
     this.shake = 0;
     this.speed = 1;
     this.state = "boot";
+    this.queuedCard = options.queuedCard || null;
+    if (this.headless) return;
     this.resize();
     window.addEventListener("resize", () => this.resize());
     if (window.visualViewport) {
@@ -195,6 +201,10 @@ export class Game {
     this.syncDrones();
     this.queueWave();
     this.ui.updateHud(this.run);
+    if (this.headless) {
+      if (this.queuedCard) applyQueuedCard(this.run, this.queuedCard);
+      return;
+    }
     this.pullQueuedCard();
   }
 
@@ -437,6 +447,10 @@ export class Game {
   }
 
   applyCard(card) {
+    if (this.remote) {
+      this.remoteAction = { action: "pick", cardId: card.id };
+      return;
+    }
     const owner = Object.entries(WEAPON_INFO).find(([, info]) => info.name === card.who);
     if (owner && !card.unlock && !card.milestone) {
       const key = owner[0];
@@ -467,7 +481,16 @@ export class Game {
     this.gainOfferXp(0);
   }
 
+  rerollOffer(used = 0) {
+    this.ui.showCards(rollBattleOffer(this.run, this.run.offerCount || 3), null, used);
+    this.audio.pickup();
+  }
+
   async rerollCards() {
+    if (this.remote) {
+      this.remoteAction = { action: "reroll" };
+      return;
+    }
     const result = await api.buyReroll(this.run.runId, this.run.offer.level);
     if (result.profile) this.ui.applyProfile?.(result.profile);
     this.ui.showCards(rollBattleOffer(this.run, this.run.offerCount || 3), null, result.used);
@@ -1065,6 +1088,10 @@ export class Game {
   }
 
   continueLevel() {
+    if (this.remote) {
+      this.remoteAction = { action: "continue" };
+      return;
+    }
     const r = this.run;
     if (r.level >= LEVELS) {
       this.end(true);
@@ -1089,6 +1116,10 @@ export class Game {
   }
 
   beginEndless() {
+    if (this.remote) {
+      this.remoteAction = { action: "endless" };
+      return;
+    }
     const r = this.run;
     r.endless = true;
     r.power = 2;
@@ -1104,6 +1135,10 @@ export class Game {
   }
 
   exitAfterLevel() {
+    if (this.remote) {
+      this.remoteAction = { action: "exit" };
+      return;
+    }
     const r = this.run;
     const won = r.levelsCleared >= LEVELS && (r.startedLevel || 1) === 1;
     this.end(won);
@@ -1138,6 +1173,7 @@ export class Game {
   }
 
   async claimFacts(facts, run) {
+    if (!api?.claimRun) return;
     try {
       const result = await api.claimRun(facts);
       forgetPending(facts.runId);
@@ -1486,6 +1522,7 @@ export class Game {
   }
 
   draw() {
+    if (this.headless || !this.ctx) return;
     const ctx = this.ctx;
     const w = this.canvas.width;
     const h = this.canvas.height;
@@ -1757,10 +1794,71 @@ export class Game {
   }
 
   loop(t) {
+    if (this.remote) {
+      this.draw(0);
+      const due = this.remoteAction || (this.state === "play" && t - (this.syncedAt || 0) > 80);
+      if (due && !this.syncing && api?.battleSync) {
+        this.syncing = true;
+        const action = this.remoteAction;
+        this.remoteAction = null;
+        api.battleSync({
+          pointer: { x: this.pointer.x, y: this.pointer.y, down: this.pointer.down },
+          speed: this.speed || 1,
+          worldW: this.worldW,
+          worldH: this.worldH,
+          action: action?.action || "",
+          cardId: action?.cardId || "",
+        }).then((data) => {
+          if (data?.snap) this.applySnap(data.snap);
+          if (data?.profile) this.ui.applyProfile?.(data.profile);
+        }).catch((error) => {
+          this.ui.toast(error.message || "Нет связи с боем");
+        }).finally(() => {
+          this.syncing = false;
+          this.syncedAt = performance.now();
+        });
+      }
+      requestAnimationFrame((n) => this.loop(n));
+      return;
+    }
     const dt = Math.min(0.033, (t - (this.last || t)) / 1000) * (this.speed || 1);
     this.last = t;
     this.update(dt);
     requestAnimationFrame((n) => this.loop(n));
+  }
+
+  async startRemote(level) {
+    const data = await api.battleStart({
+      level,
+      worldW: this.worldW,
+      worldH: this.worldH,
+    });
+    this.remote = true;
+    this.syncedAt = 0;
+    this.applySnap(data.snap);
+    this.ui.showPlay();
+  }
+
+  applySnap(snap) {
+    const prev = this.state;
+    this.state = snap.state;
+    if (snap.worldW) this.worldW = snap.worldW;
+    if (snap.worldH) this.worldH = snap.worldH;
+    this.shake = snap.shake || 0;
+    this.run = snap.run;
+    this.ui.updateHud(this.run);
+    this.ui.setCombo?.(this.run);
+    for (const text of snap.toasts || []) this.ui.toast(text);
+    if (snap.state === "cards" && snap.cardKey !== this.cardKey) {
+      this.cardKey = snap.cardKey;
+      this.ui.showCards(snap.cards, snap.heading, snap.rerollUsed || 0);
+    }
+    if (snap.state === "play" && prev === "cards") this.ui.hideCards();
+    if (snap.state === "levelclear" && prev !== "levelclear" && snap.levelClear) this.ui.showLevelClear(snap.levelClear);
+    if (snap.state === "play" && prev === "levelclear") this.ui.hideLevelClear();
+    if (snap.state === "result" && prev !== "result" && snap.result) {
+      this.ui.showResult(!!snap.result.won, this.run, snap.result.granted || null, snap.result.pending ? { pending: true } : {});
+    }
   }
 }
 
@@ -1805,6 +1903,7 @@ function writePending(list) {
 }
 
 function rememberPending(facts) {
+  if (typeof localStorage === "undefined") return;
   const list = readPending().filter((item) => item.runId !== facts.runId);
   list.push(facts);
   writePending(list);

@@ -4,10 +4,12 @@ import random
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from server.sim_bridge import SimBridge
 from server.store import Store
 
 
-def make_handler(store):
+def make_handler(store, battles=None):
+    battles = battles if battles is not None else SimBridge()
     class Handler(BaseHTTPRequestHandler):
         def do_OPTIONS(self):
             self._send(204, b"")
@@ -63,6 +65,65 @@ def make_handler(store):
             if method == "POST" and path == "/chest":
                 body = self._body()
                 self._send_json(200, store.open_chest(self._token(), random.SystemRandom(), body.get("requestId")))
+                return
+            if method == "POST" and path == "/battle/start":
+                body = self._body()
+                token = self._token()
+                profile = store.account_for_token(token)
+                run_id = body.get("runId") or __import__("uuid").uuid4().hex
+                taken = store.take_card(token, run_id)
+                snap = battles.call({
+                    "cmd": "start",
+                    "token": token,
+                    "profile": profile,
+                    "level": body.get("level") or 1,
+                    "worldW": body.get("worldW") or 720,
+                    "worldH": body.get("worldH") or 1280,
+                    "runId": run_id,
+                    "queuedCard": taken.get("card"),
+                })
+                self._send_json(200, {"snap": snap.get("snap"), "profile": taken.get("profile")})
+                return
+            if method == "POST" and path == "/battle/sync":
+                body = self._body()
+                token = self._token()
+                action = body.get("action") or ""
+                payload = {
+                    "cmd": "step",
+                    "token": token,
+                    "pointer": body.get("pointer") or {},
+                    "speed": body.get("speed") or 1,
+                    "worldW": body.get("worldW") or 0,
+                    "worldH": body.get("worldH") or 0,
+                    "action": action,
+                    "cardId": body.get("cardId") or "",
+                }
+                profile = None
+                if action == "reroll":
+                    preview = battles.call({"cmd": "snap", "token": token})
+                    snap = preview.get("snap") or {}
+                    paid = store.buy_reroll(token, snap.get("runId"), snap.get("offerLevel"))
+                    profile = paid.get("profile")
+                    payload["action"] = "reroll"
+                    payload["rerollUsed"] = paid.get("used")
+                data = battles.call(payload)
+                snap = data.get("snap") or {}
+                endless = snap.get("endless")
+                if endless:
+                    claimed = store.claim_endless(token, endless.get("level"), endless.get("wave"))
+                    profile = claimed.get("profile")
+                    battles.call({"cmd": "clear-endless", "token": token})
+                    if claimed.get("granted"):
+                        snap.setdefault("toasts", []).append(f"+{claimed['granted']} кристаллов за волну {endless.get('wave')}")
+                if snap.get("state") == "result" and snap.get("facts"):
+                    now = datetime.now(timezone.utc).astimezone()
+                    claimed = store.claim_run(token, snap["facts"], now)
+                    profile = claimed.get("profile")
+                    result = snap.get("result") or {}
+                    result["granted"] = claimed.get("granted")
+                    result["pending"] = False
+                    snap["result"] = result
+                self._send_json(200, {"snap": snap, "profile": profile})
                 return
             if method == "POST" and path == "/cards/take":
                 body = self._body()
@@ -125,7 +186,7 @@ def _suffix(path, prefix, suffix):
 
 
 def serve(host, port, db_path):
-    HTTPServer((host, port), make_handler(Store(db_path))).serve_forever()
+    HTTPServer((host, port), make_handler(Store(db_path), SimBridge())).serve_forever()
 
 
 if __name__ == "__main__":

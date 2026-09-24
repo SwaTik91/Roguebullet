@@ -80,6 +80,12 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     buyReroll(runId, offerLevel) {
       return request("/reroll", { method: "POST", body: { runId, offerLevel } });
     },
+    battleStart(body) {
+      return request("/battle/start", { method: "POST", body });
+    },
+    battleSync(body) {
+      return request("/battle/sync", { method: "POST", body });
+    },
   };
 }
 
