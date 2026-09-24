@@ -1,6 +1,6 @@
 import { SHAPES, WEAPON_INFO, enemyForWave, waveCount } from "./content.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
-import { rollBattleOffer } from "./draft.js";
+import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
@@ -388,16 +388,16 @@ export class Game {
 
   gainOfferXp(amount) {
     const offer = this.run?.offer;
-    if (!offer || offer.level >= 15) return;
+    if (!offer) return;
     offer.xp += amount;
-    while (offer.level < 15 && offer.xp >= offer.next && this.state === "play") {
+    while (offer.xp >= offer.next && offer.next > 0 && this.state === "play") {
       offer.xp -= offer.next;
       offer.level += 1;
-      offer.next = gunXpToNext(offer.level);
+      offer.next = gunXpToNext(offer.level) || 500 + offer.level * 40;
       const cards = rollBattleOffer(this.run);
       this.state = "cards";
       this.ui.showCards(cards, {
-        title: `УСИЛЕНИЕ ${offer.level}`,
+        title: "УСИЛЕНИЕ",
         sub: "Одно усиление: оружие или общая карта",
       });
       break;
@@ -414,9 +414,23 @@ export class Game {
   }
 
   applyCard(card) {
-    card.apply(this.run);
     const owner = Object.entries(WEAPON_INFO).find(([, info]) => info.name === card.who);
-    if (owner) {
+    if (owner && !card.unlock && !card.milestone) {
+      const key = owner[0];
+      const next = weaponMilestone((this.run.pips[key] || []).length);
+      if (next) {
+        const cards = legendaryOffer(this.run, key).map((item) => ({ ...item, milestone: true }));
+        this.state = "cards";
+        this.ui.showCards(cards, {
+          title: `${card.who} · ${next}`,
+          sub: "Каждое 5-е улучшение этого оружия — легендарка",
+          reroll: false,
+        });
+        return;
+      }
+    }
+    card.apply(this.run);
+    if (owner && !card.unlock) {
       const key = owner[0];
       this.run.pips[key] = this.run.pips[key] || [];
       this.run.pips[key].push(card.rarity === "legendary" ? "legendary" : "normal");

@@ -1,6 +1,6 @@
 import { defaultWep } from "./content.js";
-import { addDrones, dronePool, hasten } from "./drone.js";
-import { addCrit, addRate, gunPool } from "./gun.js";
+import { dronePool, droneStep } from "./drone.js";
+import { addCrit, gunPool, gunStep } from "./gun.js";
 
 const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1, legendary: 1 };
 
@@ -45,43 +45,6 @@ const UNLOCKS = [
   { id: "emp", title: "Импульс", desc: "Пульс вокруг ядра, замедление", rarity: "epic" },
   { id: "orb", title: "Орбиты", desc: "Вращающиеся сферы-щиты", rarity: "rare" },
   { id: "drone", title: "Дрон", desc: "Автономный перехватчик", rarity: "epic" },
-];
-
-const GUN_BRANCHES = [
-  card("queue", "Очередь", "+4 выстрела в секунду и шанс крита +15%", "legendary", (r) => {
-    r.gun.branch = "queue";
-    addRate(r.gun, 4);
-    addCrit(r, 0.15);
-  }),
-  card("volley", "Залп", "+3 пули в залпе и пробивание +2", "legendary", (r) => {
-    r.gun.branch = "volley";
-    r.gun.pellets += 3;
-    r.gun.pierce += 2;
-  }),
-  card("ricochet", "Рикошет", "Пули отскакивают 2 раза. Урон после отскока +25%", "legendary", (r) => {
-    r.gun.branch = "ricochet";
-    r.gun.bounces += 2;
-    r.gun.edgeMul = (r.gun.edgeMul || 1) * 1.25;
-  }),
-];
-
-const DRONE_BRANCHES = [
-  card("flock", "Стая", "+1 дрон и стрельба быстрее", "legendary", (r) => {
-    r.drone.branch = "flock";
-    addDrones(r.drone, 1);
-    hasten(r.drone, 0.7);
-  }),
-  card("bomb", "Бомбы", "Дроны сбрасывают бомбы. Взрыв больше", "legendary", (r) => {
-    r.drone.branch = "bomb";
-    r.drone.bombs = true;
-    r.drone.radius += 24;
-  }),
-  card("hunt", "Охота", "Урон +60%, пули быстрее, пробивание +1", "legendary", (r) => {
-    r.drone.branch = "hunt";
-    r.drone.dmg *= 1.6;
-    r.drone.speed += 200;
-    r.drone.pierce += 1;
-  }),
 ];
 
 function secondaryUpgrades(id) {
@@ -152,22 +115,154 @@ function withoutOnce(cards, host) {
 }
 
 function unlockCard(spec) {
-  return card(spec.id, spec.title, spec.desc, spec.rarity, (r) => {
+  return { ...card(spec.id, spec.title, spec.desc, spec.rarity, (r) => {
     r.weapons[spec.id] = true;
     r.wepStats[spec.id] = defaultWep(spec.id);
-  });
+  }), unlock: true };
+}
+
+const SIDE_LEGEND = {
+  laser: {
+    5: [
+      card("laser-l5a", "Прожиг", "Урон лазера ×2", "legendary", (r) => (r.wepStats.laser.dmg *= 2)),
+      card("laser-l5b", "Полотно", "Луч вдвое толще", "legendary", (r) => (r.wepStats.laser.width *= 2)),
+      card("laser-l5c", "Импульс луча", "Лазер бьёт вдвое чаще", "legendary", (r) => (r.wepStats.laser.cd *= 0.5)),
+    ],
+    10: [
+      card("laser-l10a", "Резак", "Урон лазера ×2", "legendary", (r) => (r.wepStats.laser.dmg *= 2)),
+      card("laser-l10b", "Завеса", "Луч ещё вдвое толще", "legendary", (r) => (r.wepStats.laser.width *= 2)),
+      card("laser-l10c", "Непрерывный", "Лазер бьёт ещё чаще", "legendary", (r) => (r.wepStats.laser.cd *= 0.6)),
+    ],
+    15: [
+      card("laser-l15a", "Сверхновый", "Урон лазера ×3", "legendary", (r) => (r.wepStats.laser.dmg *= 3)),
+      card("laser-l15b", "Горизонт", "Луч заполняет сектор", "legendary", (r) => (r.wepStats.laser.width += 18)),
+      card("laser-l15c", "Спектр", "Урон ×2 и луч чаще", "legendary", (r) => {
+        r.wepStats.laser.dmg *= 2;
+        r.wepStats.laser.cd *= 0.7;
+      }),
+    ],
+  },
+  scatter: {
+    5: [
+      card("sc-l5a", "Шрапнель", "+6 дробинок", "legendary", (r) => (r.wepStats.scatter.n += 6)),
+      card("sc-l5b", "Таран", "Урон дроби ×2", "legendary", (r) => (r.wepStats.scatter.dmg *= 2)),
+      card("sc-l5c", "Отбой", "Отброс ×2", "legendary", (r) => (r.wepStats.scatter.knock *= 2)),
+    ],
+    10: [
+      card("sc-l10a", "Облако", "+8 дробинок", "legendary", (r) => (r.wepStats.scatter.n += 8)),
+      card("sc-l10b", "Молот", "Урон дроби ×2", "legendary", (r) => (r.wepStats.scatter.dmg *= 2)),
+      card("sc-l10c", "Частый залп", "Дробь стреляет чаще", "legendary", (r) => (r.wepStats.scatter.cd *= 0.6)),
+    ],
+    15: [
+      card("sc-l15a", "Буря", "+10 дробинок и урон ×2", "legendary", (r) => {
+        r.wepStats.scatter.n += 10;
+        r.wepStats.scatter.dmg *= 2;
+      }),
+      card("sc-l15b", "Стена дроби", "Отброс ×2 и урон ×2", "legendary", (r) => {
+        r.wepStats.scatter.knock *= 2;
+        r.wepStats.scatter.dmg *= 2;
+      }),
+      card("sc-l15c", "Автомат", "Дробь стреляет вдвое чаще", "legendary", (r) => (r.wepStats.scatter.cd *= 0.5)),
+    ],
+  },
+  grenade: {
+    5: [
+      card("gr-l5a", "Воронка", "Радиус ×2", "legendary", (r) => (r.wepStats.grenade.radius *= 2)),
+      card("gr-l5b", "Бризант", "Урон заряда ×2", "legendary", (r) => (r.wepStats.grenade.dmg *= 2)),
+      card("gr-l5c", "Серия", "Заряды вдвое чаще", "legendary", (r) => (r.wepStats.grenade.cd *= 0.5)),
+    ],
+    10: [
+      card("gr-l10a", "Кратер", "Радиус ещё ×1.6", "legendary", (r) => (r.wepStats.grenade.radius *= 1.6)),
+      card("gr-l10b", "Тонна", "Урон ×2", "legendary", (r) => (r.wepStats.grenade.dmg *= 2)),
+      card("gr-l10c", "Канонада", "Заряды чаще и больнее", "legendary", (r) => {
+        r.wepStats.grenade.cd *= 0.7;
+        r.wepStats.grenade.dmg *= 1.5;
+      }),
+    ],
+    15: [
+      card("gr-l15a", "Эпицентр", "Радиус ×2 и урон ×2", "legendary", (r) => {
+        r.wepStats.grenade.radius *= 2;
+        r.wepStats.grenade.dmg *= 2;
+      }),
+      card("gr-l15b", "Ковёр", "Заряды вдвое чаще", "legendary", (r) => (r.wepStats.grenade.cd *= 0.5)),
+      card("gr-l15c", "Осадный", "Урон ×3", "legendary", (r) => (r.wepStats.grenade.dmg *= 3)),
+    ],
+  },
+  emp: {
+    5: [
+      card("emp-l5a", "Купол", "Радиус EMP ×2", "legendary", (r) => (r.wepStats.emp.radius *= 2)),
+      card("emp-l5b", "Разряд", "Урон EMP ×2", "legendary", (r) => (r.wepStats.emp.dmg *= 2)),
+      card("emp-l5c", "Ступор", "Замедление сильнее", "legendary", (r) => (r.wepStats.emp.slow += 0.25)),
+    ],
+    10: [
+      card("emp-l10a", "Полусфера", "Радиус ещё ×1.5", "legendary", (r) => (r.wepStats.emp.radius *= 1.5)),
+      card("emp-l10b", "Шторм", "Урон ×2", "legendary", (r) => (r.wepStats.emp.dmg *= 2)),
+      card("emp-l10c", "Частый пульс", "EMP срабатывает чаще", "legendary", (r) => (r.wepStats.emp.cd *= 0.6)),
+    ],
+    15: [
+      card("emp-l15a", "Тишина", "Радиус ×2 и сильнее замедление", "legendary", (r) => {
+        r.wepStats.emp.radius *= 2;
+        r.wepStats.emp.slow += 0.2;
+      }),
+      card("emp-l15b", "Перегрузка", "Урон ×3", "legendary", (r) => (r.wepStats.emp.dmg *= 3)),
+      card("emp-l15c", "Метроном", "EMP вдвое чаще", "legendary", (r) => (r.wepStats.emp.cd *= 0.5)),
+    ],
+  },
+  orb: {
+    5: [
+      card("orb-l5a", "Кольцо", "+2 орбиты", "legendary", (r) => (r.wepStats.orb.count += 2)),
+      card("orb-l5b", "Шипы+", "Урон орбит ×2", "legendary", (r) => (r.wepStats.orb.dmg *= 2)),
+      card("orb-l5c", "Орбита шире", "Радиус ×1.6", "legendary", (r) => (r.wepStats.orb.radius *= 1.6)),
+    ],
+    10: [
+      card("orb-l10a", "Рой+", "+2 орбиты", "legendary", (r) => (r.wepStats.orb.count += 2)),
+      card("orb-l10b", "Иглы", "Урон ×2", "legendary", (r) => (r.wepStats.orb.dmg *= 2)),
+      card("orb-l10c", "Карусель", "Орбиты крутятся быстрее", "legendary", (r) => (r.wepStats.orb.spin *= 1.8)),
+    ],
+    15: [
+      card("orb-l15a", "Сфера", "+3 орбиты и урон ×2", "legendary", (r) => {
+        r.wepStats.orb.count += 3;
+        r.wepStats.orb.dmg *= 2;
+      }),
+      card("orb-l15b", "Ореол", "Радиус ×2", "legendary", (r) => (r.wepStats.orb.radius *= 2)),
+      card("orb-l15c", "Вихрь", "Урон ×3", "legendary", (r) => (r.wepStats.orb.dmg *= 3)),
+    ],
+  },
+};
+
+export function weaponMilestone(pipCount) {
+  const next = pipCount + 1;
+  if (next === 5 || next === 10 || next === 15) return next;
+  return 0;
+}
+
+export function legendaryOffer(run, weaponKey) {
+  const next = weaponMilestone((run.pips?.[weaponKey] || []).length);
+  if (!next) return [];
+  if (weaponKey === "gun") {
+    const level = run.gun?.branch ? next : 5;
+    return tag(gunStep(level, run.gun?.branch).cards, "Пулемёт");
+  }
+  if (weaponKey === "drone") {
+    const level = run.drone?.branch ? next : 5;
+    return tag(droneStep(level, run.drone?.branch).cards, "Дрон");
+  }
+  const who = UNLOCKS.find((spec) => spec.id === weaponKey)?.title || weaponKey;
+  return tag(SIDE_LEGEND[weaponKey]?.[next] || [], who);
+}
+
+function invested(run, key) {
+  return (run.pips?.[key] || []).length;
 }
 
 export function battlePool(run) {
   const cards = tag(GENERAL, "Общая карта");
   const weapons = run.weapons || {};
 
-  cards.push(...tag(withoutOnce(gunPool(run.gun?.branch), run.gun), "Пулемёт"));
-  if (run.gun && run.gun.branch == null) cards.push(...tag(GUN_BRANCHES, "Пулемёт"));
+  if (invested(run, "gun") < 15) cards.push(...tag(withoutOnce(gunPool(run.gun?.branch), run.gun), "Пулемёт"));
 
-  if (weapons.drone && run.drone) {
+  if (weapons.drone && run.drone && invested(run, "drone") < 15) {
     cards.push(...tag(withoutOnce(dronePool(run.drone.branch), run.drone), "Дрон"));
-    if (run.drone.branch == null) cards.push(...tag(DRONE_BRANCHES, "Дрон"));
   }
 
   for (const spec of UNLOCKS) {
@@ -175,7 +270,7 @@ export function battlePool(run) {
       cards.push({ ...unlockCard(spec), who: spec.title });
       continue;
     }
-    if (spec.id !== "drone") cards.push(...tag(secondaryUpgrades(spec.id), spec.title));
+    if (spec.id !== "drone" && invested(run, spec.id) < 15) cards.push(...tag(secondaryUpgrades(spec.id), spec.title));
   }
 
   return cards;

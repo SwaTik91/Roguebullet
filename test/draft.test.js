@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultWep } from "../src/content.js";
-import { battlePool, rollBattleOffer } from "../src/draft.js";
+import { battlePool, legendaryOffer, rollBattleOffer, weaponMilestone } from "../src/draft.js";
 
 function run() {
   return {
@@ -100,28 +100,37 @@ test("common cards outweigh rare cards, which outweigh epics", () => {
   assert.ok(counts.rare > counts.epic);
 });
 
-test("gun branch card appears in the pool only when branch is null", () => {
+test("legendaries stay out of the random pool and open on the 5th, 10th and 15th pick", () => {
   const open = battlePool(run());
-  assert.ok(open.some((c) => c.id === "queue" && c.rarity === "legendary"));
-  const chosen = run();
-  chosen.gun.branch = "queue";
-  const closed = battlePool(chosen);
-  assert.equal(closed.some((c) => c.id === "queue" || c.id === "volley" || c.id === "ricochet"), false);
-  assert.ok(closed.some((c) => c.id === "spark"));
-  const offer = rollBattleOffer(run(), 99, () => 0);
-  assert.ok(offer.some((c) => c.title === "Очередь"));
-  const branched = run();
-  branched.gun.branch = "volley";
-  assert.equal(rollBattleOffer(branched, 99, () => 0).some((c) => c.id === "queue"), false);
+  assert.equal(open.some((c) => c.id === "queue" || c.rarity === "legendary"), false);
+  assert.equal(weaponMilestone(3), 0);
+  assert.equal(weaponMilestone(4), 5);
+  assert.equal(weaponMilestone(9), 10);
+  assert.equal(weaponMilestone(14), 15);
+  const fresh = run();
+  fresh.pips = { gun: ["normal", "normal", "normal", "normal"] };
+  const fifth = legendaryOffer(fresh, "gun");
+  assert.deepEqual(fifth.map((c) => c.id), ["queue", "volley", "ricochet"]);
+  assert.equal(fifth[0].who, "Пулемёт");
+  fifth[0].apply(fresh);
+  fresh.pips.gun.push("legendary");
+  fresh.pips.gun.push("normal", "normal", "normal", "normal");
+  const tenth = legendaryOffer(fresh, "gun");
+  assert.equal(tenth.length, 3);
+  assert.ok(tenth.every((c) => c.rarity === "legendary" && c.who === "Пулемёт"));
+  const maxed = run();
+  maxed.pips = { gun: Array(15).fill("normal") };
+  assert.equal(battlePool(maxed).some((c) => c.who === "Пулемёт"), false);
 });
 
 test("branch cards and once-flags apply on the right weapon", () => {
   const r = run();
-  battlePool(r).find((c) => c.id === "queue").apply(r);
+  r.pips = { gun: Array(4).fill("normal"), drone: Array(4).fill("normal") };
+  legendaryOffer(r, "gun").find((c) => c.id === "queue").apply(r);
   assert.equal(r.gun.branch, "queue");
   assert.equal(r.gun.rate, 12);
   assert.ok(Math.abs(r.crit.chance - 0.23) < 1e-9);
-  battlePool(r).find((c) => c.id === "flock").apply(r);
+  legendaryOffer(r, "drone").find((c) => c.id === "flock").apply(r);
   assert.equal(r.drone.branch, "flock");
   assert.equal(r.drone.count, 2);
   assert.ok(Math.abs(r.drone.cd - 0.26 * 0.7) < 1e-9);

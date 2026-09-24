@@ -29,11 +29,9 @@ const ui = {
     $("hud-coins").textContent = String(run.coins);
     $("hud-crit").textContent = `${Math.round((run.crit?.chance || 0) * 100)}%`;
     const box = $("weapons");
-    const offer = run.offer;
     const names = Object.keys(run.weapons || {}).filter((k) => run.weapons[k]);
-    const progress = !offer ? "" : offer.level >= 15 ? "макс" : `${offer.xp}/${offer.next}`;
     const pips = run.pips || {};
-    box.innerHTML = `<div class="wep"><b>Усиление ${offer?.level || 1}/15</b>${progress}</div>` + names.map((k) => {
+    box.innerHTML = names.map((k) => {
       const info = WEAPON_INFO[k];
       const dots = (pips[k] || []).map((kind) => `<i class="${kind === "legendary" ? "leg" : ""}" style="background:${kind === "legendary" ? "#ffb347" : info.color}"></i>`).join("");
       return `<div class="wep"><b style="color:${info.color}">${info.name}</b>${dots ? `<span class="pips">${dots}</span>` : ""}</div>`;
@@ -60,6 +58,7 @@ const ui = {
     reroll.textContent = rerollLabel(price);
     reroll.disabled = !price;
     reroll.dataset.used = String(used);
+    reroll.classList.toggle("hidden", heading?.reroll === false);
     $("card-row").innerHTML = "";
     cards.forEach((card) => {
       const btn = document.createElement("button");
