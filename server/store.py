@@ -30,6 +30,7 @@ HANGAR_KEYS = {"atk": "hangar_atk", "hp": "hangar_hp", "charge": "hangar_charge"
 MOSCOW = ZoneInfo("Europe/Moscow")
 DEFAULT_LOADOUT_JSON = "[null,null,null,null,null,null,null,null]"
 ENDLESS_PART_CHANCE = 0.30
+ENDLESS_PART_EVERY = 5
 
 
 def moscow_day(now):
@@ -553,7 +554,7 @@ class Store:
                     wave_num = int(wave)
                 except (TypeError, ValueError):
                     wave_num = 0
-                if wave_num <= 0 or wave_num % 5 != 0:
+                if wave_num <= 0 or wave_num % ENDLESS_PART_EVERY != 0:
                     profile = self._profile(account_id)
                     self.db.commit()
                     return {"part": None, "profile": profile}

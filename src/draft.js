@@ -126,6 +126,20 @@ function unlockCard(spec) {
   }), unlock: true };
 }
 
+export function codexCardGroups() {
+  const plain = (c) => ({ id: c.id, title: c.title, desc: c.desc, rarity: c.rarity });
+  const upgrades = {};
+  for (const spec of UNLOCKS) {
+    if (spec.id === "drone") continue;
+    upgrades[spec.id] = secondaryUpgrades(spec.id).map(plain);
+  }
+  return {
+    general: GENERAL.map(plain),
+    unlocks: UNLOCKS.map((spec) => ({ id: spec.id, title: spec.title, desc: spec.desc, rarity: spec.rarity })),
+    upgrades,
+  };
+}
+
 export function weaponMilestone(pipCount) {
   const next = pipCount + 1;
   if (next === 5 || next === 10 || next === 15) return next;

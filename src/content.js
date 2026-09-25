@@ -26,6 +26,14 @@ export const META_UPGRADES = [
   { key: "charge", title: "Конденсатор", desc: "Овердрайв копится быстрее" },
 ];
 
+export const CRYSTAL_SHOP = {
+  critPrice: 25,
+  critBonus: 2,
+  critCap: 10,
+  weaponPrice: 40,
+  fourthPrice: 50,
+};
+
 export function cardPool(run) {
   const cards = [
     { id: "dmg", title: "Калибр", desc: "Урон пулемёта +35%", rarity: "common", apply: (r) => (r.gun.dmg *= 1.35) },
@@ -177,46 +185,61 @@ export function pickCards(run, n = 3) {
   return out;
 }
 
+export const ENEMY_KINDS = [
+  { type: "circle", hp: 50, speed: 58, dmg: 7, r: 16, color: "#7dd3fc", xp: 6, coins: 2 },
+  { type: "triangle", hp: 34, speed: 92, dmg: 6, r: 14, color: "#fbbf24", xp: 7, coins: 2, zigzag: true },
+  { type: "square", hp: 110, speed: 40, dmg: 12, r: 20, color: "#fb7185", xp: 10, coins: 3 },
+  { type: "hex", hp: 70, speed: 52, dmg: 8, r: 18, color: "#c084fc", xp: 11, coins: 3, split: 3 },
+  { type: "diamond", hp: 84, speed: 48, dmg: 9, r: 17, color: "#34d399", xp: 10, coins: 3, shield: 50 },
+];
+
+export const ENEMY_SPAWN = [
+  { minWave: 2, chance: 0.35 },
+  { minWave: 3, chance: 0.28 },
+  { minWave: 4, chance: 0.22 },
+  { minWave: 5, chance: 0.2 },
+];
+
+export const WAVE_GROWTH = { hpPow: 1.32, chapter: 0.42, dmgPerWave: 0.06 };
+export const BOSS_EVERY = 6;
+export const BOSS_BASE = { hp: 800, speed: 28, dmg: 18, r: 78, color: "#f472b6", xp: 80, coins: 28 };
+export const WAVE_COUNT_BASE = 40;
+export const WAVE_COUNT_STEP = 12;
+export const WAVE_COUNT_MULT = 10;
+
 export function endlessEnemyWave(wave) {
   return ((wave - 1) % 5) + 1;
 }
 
 export function enemyForWave(wave, chapter, power = 1, rng = Math.random) {
-  const scale = Math.pow(1.32, wave - 1) * (1 + (chapter - 1) * 0.42) * power;
-  const table = [
-    { type: "circle", hp: 50, speed: 58, dmg: 7, r: 16, color: "#7dd3fc", xp: 6, coins: 2 },
-    { type: "triangle", hp: 34, speed: 92, dmg: 6, r: 14, color: "#fbbf24", xp: 7, coins: 2, zigzag: true },
-    { type: "square", hp: 110, speed: 40, dmg: 12, r: 20, color: "#fb7185", xp: 10, coins: 3 },
-    { type: "hex", hp: 70, speed: 52, dmg: 8, r: 18, color: "#c084fc", xp: 11, coins: 3, split: 3 },
-    { type: "diamond", hp: 84, speed: 48, dmg: 9, r: 17, color: "#34d399", xp: 10, coins: 3, shield: 50 },
-  ];
+  const scale = Math.pow(WAVE_GROWTH.hpPow, wave - 1) * (1 + (chapter - 1) * WAVE_GROWTH.chapter) * power;
 
-  if (wave % 6 === 0) {
+  if (wave % BOSS_EVERY === 0) {
     return {
       type: "boss",
-      hp: 800 * scale,
-      speed: 28,
-      dmg: 18,
-      r: 78,
-      color: "#f472b6",
-      xp: 80,
-      coins: 28,
+      hp: BOSS_BASE.hp * scale,
+      speed: BOSS_BASE.speed,
+      dmg: BOSS_BASE.dmg,
+      r: BOSS_BASE.r,
+      color: BOSS_BASE.color,
+      xp: BOSS_BASE.xp,
+      coins: BOSS_BASE.coins,
       boss: true,
     };
   }
 
   let idx = 0;
-  if (wave >= 2 && rng() < 0.35) idx = 1;
-  if (wave >= 3 && rng() < 0.28) idx = 2;
-  if (wave >= 4 && rng() < 0.22) idx = 3;
-  if (wave >= 5 && rng() < 0.2) idx = 4;
-  const e = { ...table[idx] };
+  for (let i = 0; i < ENEMY_SPAWN.length; i++) {
+    const row = ENEMY_SPAWN[i];
+    if (wave >= row.minWave && rng() < row.chance) idx = i + 1;
+  }
+  const e = { ...ENEMY_KINDS[idx] };
   e.hp *= scale;
-  e.dmg *= (1 + (wave - 1) * 0.06) * power;
+  e.dmg *= (1 + (wave - 1) * WAVE_GROWTH.dmgPerWave) * power;
   return e;
 }
 
 export function waveCount(wave) {
-  if (wave % 6 === 0) return 1;
-  return (40 + wave * 12) * 10;
+  if (wave % BOSS_EVERY === 0) return 1;
+  return (WAVE_COUNT_BASE + wave * WAVE_COUNT_STEP) * WAVE_COUNT_MULT;
 }

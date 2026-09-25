@@ -5,6 +5,9 @@ export const RARITY_STEP = {
   legendary: 4,
 };
 
+export const PART_RARITY_CUTS = { common: 0.55, rare: 0.85, epic: 0.95 };
+export const PART_UNIVERSAL_CHANCE = 0.4;
+
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 
 export const BASES = {
@@ -198,9 +201,9 @@ function affixPool(family, rarity) {
 
 function rollRarity(rng) {
   const r = rng();
-  if (r < 0.55) return "common";
-  if (r < 0.85) return "rare";
-  if (r < 0.95) return "epic";
+  if (r < PART_RARITY_CUTS.common) return "common";
+  if (r < PART_RARITY_CUTS.rare) return "rare";
+  if (r < PART_RARITY_CUTS.epic) return "epic";
   return "legendary";
 }
 
@@ -234,7 +237,7 @@ export function rollPart(rng, ownedWeapons, options = {}) {
   let family = null;
   let baseList = BASES.common;
 
-  if (familyRoll >= 0.4) {
+  if (familyRoll >= PART_UNIVERSAL_CHANCE) {
     const families = weaponFamilies(ownedWeapons);
     const idx = pickIndex(rng, families.length);
     family = families[idx];

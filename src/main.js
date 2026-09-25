@@ -2,7 +2,7 @@ import "./style.css";
 import { Game, WEAPON_INFO } from "./game.js";
 import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
-import { META_UPGRADES } from "./content.js";
+import { CRYSTAL_SHOP, META_UPGRADES } from "./content.js";
 import { api, newId } from "./api.js";
 import { describeAffix, partFamilyLabel } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
@@ -330,23 +330,23 @@ function renderShop() {
   const rows = [
     {
       title: "Шанс крита",
-      desc: `+2% навсегда · ${Math.min(5, Math.floor((profile?.critBonus || 0) / 2))}/5`,
-      label: (profile?.critBonus || 0) >= 10 ? "МАКС" : "25",
-      disabled: crystals < 25 || (profile?.critBonus || 0) >= 10,
+      desc: `+${CRYSTAL_SHOP.critBonus}% навсегда · ${Math.min(CRYSTAL_SHOP.critCap / CRYSTAL_SHOP.critBonus, Math.floor((profile?.critBonus || 0) / CRYSTAL_SHOP.critBonus))}/${CRYSTAL_SHOP.critCap / CRYSTAL_SHOP.critBonus}`,
+      label: (profile?.critBonus || 0) >= CRYSTAL_SHOP.critCap ? "МАКС" : String(CRYSTAL_SHOP.critPrice),
+      disabled: crystals < CRYSTAL_SHOP.critPrice || (profile?.critBonus || 0) >= CRYSTAL_SHOP.critCap,
       run: () => api.buyShop("crit"),
     },
     ...SHOP_WEAPONS.map((id) => ({
       title: WEAPON_INFO[id].name,
       desc: "Есть с начала каждого забега",
-      label: owned.has(id) ? "ЕСТЬ" : "40",
-      disabled: owned.has(id) || crystals < 40,
+      label: owned.has(id) ? "ЕСТЬ" : String(CRYSTAL_SHOP.weaponPrice),
+      disabled: owned.has(id) || crystals < CRYSTAL_SHOP.weaponPrice,
       run: () => api.buyShop("weapon", id),
     })),
     {
       title: "Четвёртая карта",
       desc: "В выборе усиления 4 карты вместо 3",
-      label: profile?.fourthCard ? "ЕСТЬ" : "50",
-      disabled: !!profile?.fourthCard || crystals < 50,
+      label: profile?.fourthCard ? "ЕСТЬ" : String(CRYSTAL_SHOP.fourthPrice),
+      disabled: !!profile?.fourthCard || crystals < CRYSTAL_SHOP.fourthPrice,
       run: () => api.buyShop("fourth_card"),
     },
   ];

@@ -12,7 +12,41 @@ const gatling = typeof Image === "undefined" ? null : new Image();
 if (gatling) gatling.src = "/gatling.png";
 
 const LEVELS = 3;
-const OFFER_XP_MULT = 5;
+export const OFFER_XP_MULT = 5;
+export const HANGAR_ATK_STEP = 0.12;
+export const HANGAR_HP_STEP = 40;
+export const TOWER_BASE_HP = 220;
+export const GUN_START = {
+  dmg: 17,
+  rate: 8,
+  pellets: 1,
+  pierce: 0,
+  bounces: 0,
+  life: 1.15,
+  speed: 680,
+  gap: 12,
+  autoTurn: 2.6,
+};
+export const DRONE_START = {
+  dmg: 24,
+  count: 1,
+  cd: 0.24,
+  bombs: false,
+  radius: 64,
+  bombMul: 1.6,
+  speed: 560,
+  life: 0.9,
+  pierce: 0,
+  pellets: 1,
+  falloff: 0,
+  bombOnHit: false,
+};
+export const CRIT_START = { chance: 0.08, mul: 2 };
+export const OVERDRIVE = { max: 100, dur: 3.4, mul: 1.85, startPerHangar: 8, shotGain: 1.6, hangarRate: 0.18 };
+export const RESONANCE_NEED = 6;
+export const RESONANCE_RADIUS = 210;
+export const RESONANCE_DMG = 55;
+export const RESONANCE_DMG_PER_WAVE = 6;
 
 const PART_DROP_RARITY = {
   common: "обычная",
@@ -135,8 +169,8 @@ export class Game {
     const profile = this.profile || {};
     const hangar = profile.hangar || { atk: 0, hp: 0, charge: 0 };
     const startLevel = Math.min(3, Math.max(1, Number(level) || 1));
-    const atk = 1 + (hangar.atk || 0) * 0.12;
-    const hp = 220 + (hangar.hp || 0) * 40;
+    const atk = 1 + (hangar.atk || 0) * HANGAR_ATK_STEP;
+    const hp = TOWER_BASE_HP + (hangar.hp || 0) * HANGAR_HP_STEP;
     const gear = startingLoadout(profile);
     this.run = {
       runId: newId(),
@@ -150,13 +184,20 @@ export class Game {
       coins: 0,
       xp: 0,
       nextXp: 18,
-      comboNeed: 6,
+      comboNeed: RESONANCE_NEED,
       comboType: null,
       combo: 0,
       comboFlash: 0,
       bossIntro: 0,
       bossPulse: 0,
-      overdrive: { charge: 8 * (hangar.charge || 0), max: 100, dur: 3.4, left: 0, mul: 1.85, chargeGain: 0 },
+      overdrive: {
+        charge: OVERDRIVE.startPerHangar * (hangar.charge || 0),
+        max: OVERDRIVE.max,
+        dur: OVERDRIVE.dur,
+        left: 0,
+        mul: OVERDRIVE.mul,
+        chargeGain: 0,
+      },
       offer: { level: 1, xp: 0, next: gunXpToNext(1) },
       pips: {},
       endless: false,
@@ -167,18 +208,7 @@ export class Game {
       offerCount: gear.cards,
       drones: [],
       drone: {
-        dmg: 24,
-        count: 1,
-        cd: 0.24,
-        bombs: false,
-        radius: 64,
-        bombMul: 1.6,
-        speed: 560,
-        life: 0.9,
-        pierce: 0,
-        pellets: 1,
-        falloff: 0,
-        bombOnHit: false,
+        ...DRONE_START,
         level: 1,
         xp: 0,
         next: gunXpToNext(1),
@@ -187,14 +217,14 @@ export class Game {
       orbAngle: 0,
       gun: {
         angle: -Math.PI / 2,
-        dmg: 17 * atk,
-        rate: 8,
-        pellets: 1,
-        pierce: 0,
-        bounces: 0,
-        life: 1.15,
-        speed: 680,
-        gap: 12,
+        dmg: GUN_START.dmg * atk,
+        rate: GUN_START.rate,
+        pellets: GUN_START.pellets,
+        pierce: GUN_START.pierce,
+        bounces: GUN_START.bounces,
+        life: GUN_START.life,
+        speed: GUN_START.speed,
+        gap: GUN_START.gap,
         edgeMul: 1,
         swarm: false,
         falloff: 0,
@@ -206,10 +236,10 @@ export class Game {
         xp: 0,
         next: gunXpToNext(1),
         branch: null,
-        autoTurn: 2.6,
+        autoTurn: GUN_START.autoTurn,
         cd: 0,
       },
-      crit: { chance: 0.08 + (profile.critBonus || 0) / 100, mul: 2 },
+      crit: { chance: CRIT_START.chance + (profile.critBonus || 0) / 100, mul: CRIT_START.mul },
       tower: { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 },
       enemies: [],
       bullets: [],
@@ -470,7 +500,9 @@ export class Game {
     this.audio.boom();
     this.burst(x, y, "#c084fc", 26);
     for (const e of this.run.enemies) {
-      if (!e.dead && dist(e, { x, y }) < 210) this.damage(e, 55 + this.run.wave * 6, "#c084fc");
+      if (!e.dead && dist(e, { x, y }) < RESONANCE_RADIUS) {
+        this.damage(e, RESONANCE_DMG + this.run.wave * RESONANCE_DMG_PER_WAVE, "#c084fc");
+      }
     }
     this.shake = 8;
   }
@@ -590,7 +622,7 @@ export class Game {
         hit: new Set(),
       });
     }
-    const gain = 1.6 * (1 + this.meta.charge * 0.18) * (1 + (this.run.overdrive.chargeGain || 0));
+    const gain = OVERDRIVE.shotGain * (1 + this.meta.charge * OVERDRIVE.hangarRate) * (1 + (this.run.overdrive.chargeGain || 0));
     if (this.run.overdrive.left <= 0) this.run.overdrive.charge += gain;
     if (this.run.overdrive.charge >= this.run.overdrive.max) {
       this.run.overdrive.charge = 0;
