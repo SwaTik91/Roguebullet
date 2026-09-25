@@ -8,6 +8,7 @@ import {
   sumBonuses,
   applyBonuses,
   describeAffix,
+  partFamilyLabel,
 } from "../src/parts.js";
 import { Game, retryPendingPartRolls } from "../src/game.js";
 
@@ -64,6 +65,12 @@ test("describeAffix formats epic regen without float junk", () => {
 test("describeAffix keeps a leading zero on negative cooldown", () => {
   const text = describeAffix("drone", { id: "cd", name: "перезарядка", step: 1 });
   assert.equal(text, "перезарядка дрона: -0.02");
+});
+
+test("orb family is labeled orbit", () => {
+  assert.equal(partFamilyLabel("orb"), "Орбита");
+  const text = describeAffix("orb", { id: "dmg", name: "урон", step: 1 });
+  assert.equal(text, "урон орбиты: +4%");
 });
 
 test("forced rarity ignores the rarity roll", () => {

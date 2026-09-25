@@ -271,7 +271,7 @@ export function partFamilyLabel(family) {
     scatter: "Дробь",
     grenade: "Граната",
     emp: "EMP",
-    orb: "Сферы",
+    orb: "Орбита",
   }[family] || "Общая";
 }
 
@@ -282,7 +282,7 @@ const FAMILY_OF = {
   scatter: "дроби",
   grenade: "гранаты",
   emp: "EMP",
-  orb: "сфер",
+  orb: "орбиты",
 };
 
 export function describeAffix(family, affix) {
