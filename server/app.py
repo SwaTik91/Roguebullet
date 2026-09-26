@@ -39,6 +39,26 @@ def make_handler(store, battles=None):
                 body = self._body()
                 self._send_json(200, store.login(body.get("name"), body.get("password")))
                 return
+            if method == "POST" and path == "/guest":
+                now = datetime.now(timezone.utc)
+                self._send_json(200, store.create_guest(self._client_ip(), now))
+                return
+            if method == "POST" and path == "/account/save":
+                body = self._body()
+                self._send_json(200, store.save_account(self._token(), body.get("name"), body.get("password")))
+                return
+            if method == "POST" and path == "/events/run-start":
+                self._send_json(200, store.record_run_start(self._token(), self._body()))
+                return
+            if method == "POST" and path == "/events/run-end":
+                self._send_json(200, store.record_run_end(self._token(), self._body()))
+                return
+            if method == "GET" and path == "/stats/summary":
+                query = self.path.split("?", 1)[1] if "?" in self.path else ""
+                days = _query_value(query, "days") or "7"
+                days = "all" if days == "all" else int(days)
+                self._send_json(200, store.stats_summary(days))
+                return
             if method == "GET" and path == "/me":
                 self._send_json(200, {"profile": store.account_for_token(self._token())})
                 return
@@ -177,6 +197,12 @@ def make_handler(store, battles=None):
                 raise ValueError("Нужна сессия")
             return header[7:].strip()
 
+        def _client_ip(self):
+            forwarded = self.headers.get("X-Forwarded-For") if self.headers else ""
+            if forwarded:
+                return forwarded.split(",")[0].strip()
+            return self.client_address[0] if self.client_address else "unknown"
+
         def _body(self):
             length = self.headers.get("Content-Length") if self.headers else None
             raw = self.rfile.read(int(length)) if length else self.rfile.read()
@@ -215,8 +241,22 @@ def _suffix(path, prefix, suffix):
     return ""
 
 
+def _query_value(query, key):
+    for pair in query.split("&"):
+        if "=" in pair:
+            name, value = pair.split("=", 1)
+            if name == key:
+                return value
+    return ""
+
+
 def serve(host, port, db_path):
-    HTTPServer((host, port), make_handler(Store(db_path), SimBridge())).serve_forever()
+    store = Store(db_path)
+    try:
+        store.purge_old_events()
+    except Exception:
+        pass
+    HTTPServer((host, port), make_handler(store, SimBridge())).serve_forever()
 
 
 if __name__ == "__main__":

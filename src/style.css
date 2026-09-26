@@ -554,6 +554,109 @@ h2 {
   color: var(--amber);
 }
 
+.hub-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: linear-gradient(180deg, rgba(5, 6, 12, 0.92), rgba(5, 6, 12, 0.4));
+  pointer-events: none;
+}
+
+.hub-stats {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.hub-stats b {
+  font-family: Orbitron, Manrope, sans-serif;
+}
+
+.hub-stats .gold b {
+  color: var(--amber);
+}
+
+.hub-stats .cyan b {
+  color: var(--cyan);
+}
+
+.gear-btn {
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 232, 255, 0.3);
+  background: rgba(12, 16, 28, 0.8);
+  color: #cfe9ff;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, rgba(5, 6, 12, 0.96), rgba(5, 6, 12, 0.6));
+  border-top: 1px solid rgba(126, 232, 255, 0.16);
+}
+
+.tabbar .tab {
+  position: relative;
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #8ea3b8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tabbar .tab.active {
+  background: rgba(126, 232, 255, 0.14);
+  color: #eaf6ff;
+}
+
+.tabbar .badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 26px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pink);
+  box-shadow: 0 0 6px rgba(244, 114, 182, 0.8);
+}
+
+.tab-panel {
+  padding-top: calc(64px + env(safe-area-inset-top));
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+.big-play {
+  font-size: 20px;
+  padding: 18px;
+}
+
+.shop-chest-title {
+  margin-top: 18px;
+}
+
 .toast {
   position: absolute;
   top: calc(168px + env(safe-area-inset-top));

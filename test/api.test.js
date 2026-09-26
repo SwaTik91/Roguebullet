@@ -181,3 +181,40 @@ test("rollPart posts the body to /parts/roll", async () => {
   assert.deepEqual(JSON.parse(calls[0].options.body), body);
   assert.equal(calls[0].options.method, "POST");
 });
+
+test("guest stores the token from /guest", async () => {
+  const saved = {};
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: { getItem: (k) => saved[k] || "", setItem: (k, v) => { saved[k] = v; } },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ token: "g1", profile: { isGuest: true } }) };
+    },
+  });
+  const session = await api.guest();
+  assert.equal(calls[0].url, "http://api.test/guest");
+  assert.equal(session.profile.isGuest, true);
+  assert.equal(api.token(), "g1");
+});
+
+test("saveAccount and analytics events post to their routes", async () => {
+  const calls = [];
+  const api = createApi({
+    base: "http://api.test",
+    storage: { getItem: () => "abc", setItem: () => {} },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ profile: {} }) };
+    },
+  });
+  await api.saveAccount("Newbie", "secret-pass");
+  await api.runStart({ runId: "r1", level: 1 });
+  await api.runEnd({ runId: "r1", outcome: "died" });
+  assert.equal(calls[0].url, "http://api.test/account/save");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { name: "Newbie", password: "secret-pass" });
+  assert.equal(calls[1].url, "http://api.test/events/run-start");
+  assert.equal(calls[2].url, "http://api.test/events/run-end");
+  assert.equal(JSON.parse(calls[2].options.body).outcome, "died");
+});

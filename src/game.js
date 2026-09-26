@@ -262,7 +262,53 @@ export class Game {
       if (this.queuedCard) applyQueuedCard(this.run, this.queuedCard);
       return;
     }
+    this.reportRunStart();
     this.pullQueuedCard();
+  }
+
+  reportRunStart() {
+    if (this.headless || this.remote || !api || !api.token()) return;
+    this.run._startedAt = performance.now();
+    const profile = this.profile || {};
+    const loadout = new Set((profile.loadout || []).filter(Boolean));
+    const parts = (profile.parts || [])
+      .filter((p) => loadout.has(p.id))
+      .map((p) => ({ base: p.base, family: p.family, rarity: p.rarity }));
+    api
+      .runStart({
+        runId: this.run.runId,
+        level: this.run.startedLevel || 1,
+        weapons: profile.weapons || [],
+        parts,
+      })
+      .catch(() => {});
+  }
+
+  reportRunEnd(outcome) {
+    if (this.headless || this.remote || !api || !api.token() || !this.run) return;
+    const run = this.run;
+    if (run._endReported) return;
+    run._endReported = true;
+    const branches = {};
+    if (run.gun?.branch) branches.gun = run.gun.branch;
+    if (run.drone?.branch) branches.drone = run.drone.branch;
+    for (const [id, stats] of Object.entries(run.wepStats || {})) {
+      if (stats?.branch) branches[id] = stats.branch;
+    }
+    const kills = Object.values(run.kills || {}).reduce((a, b) => a + b, 0);
+    api
+      .runEnd({
+        runId: run.runId,
+        outcome,
+        level: run.level,
+        wave: run.wave,
+        duration: Math.round((performance.now() - (run._startedAt || performance.now())) / 1000),
+        kills,
+        cards: run.takenCards || [],
+        branches,
+        legendaries: run.takenLegendaries || [],
+      })
+      .catch(() => {});
   }
 
   async pullQueuedCard() {
@@ -445,7 +491,7 @@ export class Game {
     else this.run.kills[bucket] += 1;
     this.run.coins += e.coins;
     this.run.xp += e.xp;
-    this.gainOfferXp(OFFER_XP_MULT);
+    this.gainOfferXp(this.profile?.tester ? OFFER_XP_MULT : 1);
     this.audio.hit();
     this.burst(e.x, e.y, e.color, e.boss ? 28 : 12);
     this.shake = Math.max(this.shake, e.boss ? 10 : 3);
@@ -537,6 +583,14 @@ export class Game {
       const key = owner[0];
       this.run.pips[key] = this.run.pips[key] || [];
       this.run.pips[key].push(card.rarity === "legendary" ? "legendary" : "normal");
+    }
+    if (this.run) {
+      this.run.takenCards = this.run.takenCards || [];
+      this.run.takenCards.push({ title: card.title, weapon: card.who || null });
+      if (card.milestone || card.rarity === "legendary") {
+        this.run.takenLegendaries = this.run.takenLegendaries || [];
+        this.run.takenLegendaries.push(card.title);
+      }
     }
     this.state = "play";
     this.ui.hideCards();
@@ -1301,7 +1355,7 @@ export class Game {
     }
     const r = this.run;
     const won = r.levelsCleared >= LEVELS && (r.startedLevel || 1) === 1;
-    this.end(won);
+    this.end(won, won ? "cleared" : "quit");
   }
 
   facts() {
@@ -1317,9 +1371,10 @@ export class Game {
     };
   }
 
-  end(win) {
+  end(win, reason) {
     this.state = "result";
     this.run.won = win;
+    this.reportRunEnd(reason || (win ? "cleared" : "died"));
     const run = this.run;
     const progress = (run.level - 1) * 6 + run.wave;
     this.meta.bestWave = Math.max(this.meta.bestWave, progress);
@@ -1646,7 +1701,7 @@ export class Game {
         }
         if (tw.hp <= 0) {
           tw.hp = 0;
-          this.end(false);
+          this.end(false, "died");
           this.draw(dt);
           return;
         }

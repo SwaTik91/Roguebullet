@@ -55,6 +55,23 @@
         <button id="btn-speed" class="speed-btn" type="button">×1</button>
       </div>
 
+      <div id="hub-top" class="hub-top hidden">
+        <div class="hub-stats">
+          <span>Ур. <b id="menu-account">1</b></span>
+          <span class="gold">Монеты <b id="menu-coins">0</b></span>
+          <span class="cyan">Кристаллы <b id="menu-crystals">0</b></span>
+        </div>
+        <button id="btn-gear" class="gear-btn" type="button" aria-label="Настройки">⚙</button>
+      </div>
+
+      <nav id="tabbar" class="tabbar hidden">
+        <button class="tab" type="button" data-tab="play">Бой</button>
+        <button class="tab" type="button" data-tab="hangar">Ангар<i class="badge hidden" id="badge-hangar"></i></button>
+        <button class="tab" type="button" data-tab="parts">Инвентарь<i class="badge hidden" id="badge-parts"></i></button>
+        <button class="tab" type="button" data-tab="shop">Магазин<i class="badge hidden" id="badge-shop"></i></button>
+        <button class="tab" type="button" data-tab="tasks">Задания<i class="badge hidden" id="badge-tasks"></i></button>
+      </nav>
+
       <div id="screen-login" class="screen">
         <div class="logo">
           <div class="logo-mark" aria-hidden="true"></div>
@@ -68,28 +85,16 @@
         <button class="btn" id="btn-register">СОЗДАТЬ АККАУНТ</button>
       </div>
 
-      <div id="screen-menu" class="screen hidden scroll">
+      <div id="screen-menu" class="screen hidden scroll tab-panel">
         <div class="logo">
           <div class="logo-mark" aria-hidden="true"></div>
           <h1>POLY<span>SPIRE</span></h1>
           <p>Грань. Ядро. Удержи.</p>
         </div>
-        <div class="menu-stats">
-          <div><span>Аккаунт</span><b id="menu-account">1</b></div>
-          <div><span>Монеты</span><b id="menu-coins">0</b></div>
-          <div><span>Кристаллы</span><b id="menu-crystals">0</b></div>
-        </div>
-        <button class="btn primary" id="btn-play">В БОЙ</button>
-        <button class="btn" id="btn-coop">ВМЕСТЕ</button>
-        <button class="btn" id="btn-hangar">АНГАР</button>
-        <button class="btn" id="btn-parts">ИНВЕНТАРЬ</button>
-        <button class="btn" id="btn-shop">КРИСТАЛЛЫ</button>
-        <button class="btn" id="btn-chest">СУНДУК</button>
-        <button class="btn" id="btn-dailies">ДЕЙЛИКИ</button>
-        <button class="btn" id="btn-achievements">ДОСТИЖЕНИЯ</button>
-        <button class="btn ghost" id="btn-how">КАК ИГРАТЬ</button>
-        <button class="btn ghost" id="btn-settings">НАСТРОЙКИ</button>
-        <button class="btn ghost" id="btn-dev">ТЕСТ</button>
+        <button class="btn primary big-play" id="btn-play">В БОЙ · УРОВЕНЬ 1</button>
+        <button class="btn ghost" id="btn-pick-level">ВЫБРАТЬ УРОВЕНЬ</button>
+        <button class="btn" id="btn-coop" hidden>ВМЕСТЕ</button>
+        <button class="btn ghost" id="btn-dev" hidden>ТЕСТ</button>
       </div>
 
       <div id="screen-levels" class="screen hidden scroll">
@@ -110,12 +115,11 @@
         <button class="btn" id="btn-coop-back">НАЗАД</button>
       </div>
 
-      <div id="screen-hangar" class="screen hidden scroll">
+      <div id="screen-hangar" class="screen hidden scroll tab-panel">
         <h2>АНГАР</h2>
         <p class="sub">Постоянные усилители между вылетами.</p>
         <div class="coins-line">Доступно: <b id="hangar-coins">0</b></div>
         <div class="upgrade-list" id="hangar-list"></div>
-        <button class="btn" id="btn-hangar-back">НАЗАД</button>
       </div>
 
       <div id="screen-dev" class="screen hidden scroll">
@@ -131,43 +135,32 @@
         <button class="btn" id="btn-dev-back">НАЗАД</button>
       </div>
 
-      <div id="screen-parts" class="screen hidden scroll">
+      <div id="screen-parts" class="screen hidden scroll tab-panel">
         <h2>ИНВЕНТАРЬ</h2>
         <p class="sub">Надетые детали меняют бой. Нажми слот, чтобы снять.</p>
         <div class="parts-grid" id="parts-slots"></div>
         <p class="sub">Склад — нажми деталь, чтобы надеть в первый подходящий слот.</p>
         <div class="upgrade-list" id="parts-list"></div>
-        <button class="btn" id="btn-parts-back">НАЗАД</button>
       </div>
 
-      <div id="screen-shop" class="screen hidden scroll">
-        <h2>КРИСТАЛЛЫ</h2>
-        <p class="sub">Редкие покупки. Монеты здесь не принимают.</p>
+      <div id="screen-shop" class="screen hidden scroll tab-panel">
+        <h2>МАГАЗИН</h2>
+        <p class="sub">Покупки за кристаллы. Монеты здесь не принимают.</p>
         <div class="coins-line">Кристаллы: <b id="shop-crystals">0</b></div>
         <div class="upgrade-list" id="shop-list"></div>
-        <button class="btn" id="btn-shop-back">НАЗАД</button>
-      </div>
-
-      <div id="screen-chest" class="screen hidden">
-        <h2>СУНДУК</h2>
+        <h3 class="shop-chest-title">Сундук</h3>
         <p class="sub">20 кристаллов. Награду выбирает сервер.</p>
         <p id="chest-result" class="sub"></p>
         <button class="btn primary" id="btn-chest-open">ОТКРЫТЬ</button>
-        <button class="btn" id="btn-chest-back">НАЗАД</button>
       </div>
 
-      <div id="screen-dailies" class="screen hidden scroll">
-        <h2>ДЕЙЛИКИ</h2>
+      <div id="screen-dailies" class="screen hidden scroll tab-panel">
+        <h2>ЗАДАНИЯ</h2>
         <p class="sub">Сброс в 00:00 по Москве. Незабранное сгорает.</p>
         <div class="upgrade-list" id="daily-list"></div>
-        <button class="btn" id="btn-dailies-back">НАЗАД</button>
-      </div>
-
-      <div id="screen-achievements" class="screen hidden scroll">
-        <h2>ДОСТИЖЕНИЯ</h2>
+        <h3>Достижения</h3>
         <p class="sub">Один раз на аккаунт. Награда только кристаллами.</p>
         <div class="upgrade-list" id="achievement-list"></div>
-        <button class="btn" id="btn-achievements-back">НАЗАД</button>
       </div>
 
       <div id="screen-how" class="screen hidden">
@@ -191,7 +184,20 @@
         <p class="sub">Можно менять прямо между боями.</p>
         <button class="btn" id="btn-damage-toggle">ПОКАЗ УРОНА: ВКЛ</button>
         <p class="sub">Цифры урона над врагами. Крит подсвечен золотом.</p>
+        <button class="btn" id="btn-how2">КАК ИГРАТЬ</button>
+        <button class="btn primary" id="btn-save-progress" hidden>СОХРАНИТЬ ПРОГРЕСС</button>
+        <button class="btn" id="btn-login-other">ВОЙТИ В ДРУГОЙ АККАУНТ</button>
         <button class="btn" id="btn-settings-back">НАЗАД</button>
+      </div>
+
+      <div id="screen-save" class="screen hidden">
+        <h2>СОХРАНИТЬ ПРОГРЕСС</h2>
+        <p class="sub">Придумай имя и пароль. Монеты, кристаллы и запчасти останутся. Без сохранения прогресс гостя пропадёт, если очистить браузер.</p>
+        <input class="field" id="save-name" maxlength="24" placeholder="Имя" />
+        <input class="field" id="save-password" type="password" maxlength="64" placeholder="Пароль" />
+        <p id="save-error" class="sub error"></p>
+        <button class="btn primary" id="btn-save-confirm">СОХРАНИТЬ</button>
+        <button class="btn" id="btn-save-back">ПОЗЖЕ</button>
       </div>
 
       <div id="screen-cards" class="screen dim hidden">

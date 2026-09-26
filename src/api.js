@@ -48,6 +48,20 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
       storage.setItem(TOKEN_KEY, data.token || "");
       return data;
     },
+    async guest() {
+      const data = await request("/guest", { method: "POST", body: {}, auth: false });
+      storage.setItem(TOKEN_KEY, data.token || "");
+      return data;
+    },
+    saveAccount(name, password) {
+      return request("/account/save", { method: "POST", body: { name, password } });
+    },
+    runStart(body) {
+      return request("/events/run-start", { method: "POST", body });
+    },
+    runEnd(body) {
+      return request("/events/run-end", { method: "POST", body });
+    },
     me() {
       return request("/me");
     },

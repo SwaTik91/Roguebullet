@@ -1,0 +1,4 @@
+# PolySpire nightly database backup at 04:00 Europe/Moscow.
+# Install to /etc/cron.d/roguebullet-backup
+CRON_TZ=Europe/Moscow
+0 4 * * * root /usr/bin/python3 /var/www/roguebullet-src/server/backup_db.py >> /var/log/roguebullet-backup.log 2>&1

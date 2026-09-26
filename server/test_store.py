@@ -144,7 +144,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(again["part"]["id"], "p1")
         self.assertEqual(len(again["profile"]["parts"]), 1)
 
-        second = self.store.roll_part(token, "run-a", "level", 2, None, dry, roller=roller)
+        second = self.store.roll_part(token, "run-a", "level", 2, None, lucky, roller=roller)
         self.assertIsNotNone(second["part"])
         self.assertEqual(second["part"]["id"], "p2")
         self.assertEqual(second["profile"]["partsDry"], 0)
@@ -173,7 +173,7 @@ class StoreTests(unittest.TestCase):
         self.assertIsNone(equipped["profile"]["loadout"][0])
 
     def test_dev_grants_crystals_and_a_part_of_the_asked_rarity(self):
-        token = self.store.register("Ada", "secret-pass")["token"]
+        token = self.store.register("Sharon", "secret-pass")["token"]
         before = self.store.account_for_token(token)["crystals"]
         granted = self.store.dev_crystals(token, 100)
         self.assertEqual(granted["granted"], 100)
@@ -193,6 +193,90 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(len(dropped["profile"]["parts"]), 1)
         with self.assertRaises(ValueError):
             self.store.dev_part(token, "mythic", lambda: 0.1, roller=roller)
+
+    def test_dev_is_denied_for_non_testers(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        with self.assertRaises(ValueError) as ctx:
+            self.store.dev_crystals(token, 100)
+        self.assertEqual(str(ctx.exception), "Нет доступа")
+        with self.assertRaises(ValueError):
+            self.store.dev_part(token, "common", lambda: 0.1)
+
+    def test_level_drop_uses_chance_and_pity_for_players(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        dry = lambda: 0.9
+
+        def roller(_rng, _owned):
+            return {
+                "base": "barrel",
+                "baseName": "Ствол",
+                "family": "gun",
+                "rarity": "common",
+                "affixes": [{"id": "dmg", "name": "урон", "step": 1}],
+            }
+
+        for level in range(1, 4):
+            result = self.store.roll_part(token, "run-dry", "level", level, None, dry, roller=roller)
+            self.assertIsNone(result["part"])
+            self.assertEqual(result["profile"]["partsDry"], level)
+        pity = self.store.roll_part(token, "run-dry", "level", 4, None, dry, roller=roller)
+        self.assertIsNotNone(pity["part"])
+        self.assertEqual(pity["profile"]["partsDry"], 0)
+
+    def test_level_drop_is_guaranteed_for_testers(self):
+        token = self.store.register("Sharon", "secret-pass")["token"]
+        dry = lambda: 0.9
+
+        def roller(_rng, _owned):
+            return {
+                "base": "barrel",
+                "baseName": "Ствол",
+                "family": "gun",
+                "rarity": "common",
+                "affixes": [{"id": "dmg", "name": "урон", "step": 1}],
+            }
+
+        result = self.store.roll_part(token, "run-t", "level", 1, None, dry, roller=roller)
+        self.assertIsNotNone(result["part"])
+
+    def test_guest_login_and_save_progress(self):
+        guest = self.store.create_guest("1.2.3.4")
+        self.assertTrue(guest["profile"]["isGuest"])
+        self.assertTrue(guest["profile"]["name"].startswith("Гость-"))
+        saved = self.store.save_account(guest["token"], "Newbie", "secret-pass")
+        self.assertFalse(saved["profile"]["isGuest"])
+        self.assertEqual(saved["profile"]["name"], "Newbie")
+        again = self.store.login("newbie", "secret-pass")
+        self.assertEqual(again["profile"]["name"], "Newbie")
+        with self.assertRaises(ValueError):
+            self.store.save_account(guest["token"], "Other", "secret-pass")
+
+    def test_guest_cap_per_ip_per_day(self):
+        for _ in range(20):
+            self.store.create_guest("9.9.9.9")
+        with self.assertRaises(ValueError):
+            self.store.create_guest("9.9.9.9")
+
+    def test_run_events_summary_excludes_testers_and_names(self):
+        player = self.store.register("Ada", "secret-pass")["token"]
+        tester = self.store.register("Sharon", "secret-pass")["token"]
+        self.store.record_run_start(player, {"runId": "r1", "level": 1, "weapons": ["laser"], "parts": []})
+        self.store.record_run_end(
+            player,
+            {"runId": "r1", "outcome": "died", "level": 1, "wave": 4, "duration": 120, "kills": 30,
+             "cards": [{"title": "Калибр", "weapon": "gun"}], "branches": {"gun": "volley"}, "legendaries": []},
+        )
+        self.store.record_run_end(
+            player,
+            {"runId": "r1", "outcome": "cleared", "level": 2, "wave": 6, "duration": 200, "kills": 40},
+        )
+        self.store.record_run_start(tester, {"runId": "r2", "level": 1})
+        self.store.record_run_end(tester, {"runId": "r2", "outcome": "died", "level": 1, "wave": 1, "duration": 5})
+        summary = self.store.stats_summary("all")
+        self.assertEqual(summary["runs"], 1)
+        self.assertEqual(summary["deaths"], {"1-4": 1})
+        self.assertEqual(summary["weaponBranches"], {"gun": {"volley": 1}})
+        self.assertNotIn("Sharon", json.dumps(summary, ensure_ascii=False))
 
 
 class HandlerTests(unittest.TestCase):

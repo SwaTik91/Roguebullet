@@ -175,16 +175,25 @@ const SCREENS = [
   "screen-hangar",
   "screen-parts",
   "screen-shop",
-  "screen-chest",
   "screen-dailies",
-  "screen-achievements",
   "screen-how",
   "screen-settings",
+  "screen-save",
   "screen-dev",
   "screen-cards",
   "screen-result",
   "screen-level-clear",
 ];
+const HUB_TABS = {
+  play: { screen: "screen-menu", render: refreshMenu },
+  hangar: { screen: "screen-hangar", render: () => renderHangar() },
+  parts: { screen: "screen-parts", render: () => renderParts() },
+  shop: { screen: "screen-shop", render: () => renderShop() },
+  tasks: { screen: "screen-dailies", render: () => renderTasks() },
+};
+const FURTHEST_LEVEL = 3;
+const SEEN_PARTS_KEY = "roguebullet-seen-parts";
+const SAVE_PROMPT_KEY = "roguebullet-save-prompt-shown";
 const SHOP_WEAPONS = ["laser", "scatter", "grenade", "emp", "orb", "drone"];
 const DAILY_TITLES = {
   wave3: "Пройти 3-ю волну",
@@ -211,15 +220,39 @@ function hideAll() {
   for (const id of SCREENS) $(id).classList.add("hidden");
 }
 
+function setHubChrome(on) {
+  $("hub-top").classList.toggle("hidden", !on);
+  $("tabbar").classList.toggle("hidden", !on);
+}
+
 function openScreen(id) {
   hideAll();
+  setHubChrome(false);
   $(id).classList.remove("hidden");
+}
+
+let activeTab = "play";
+
+function showTab(name) {
+  const tab = HUB_TABS[name] || HUB_TABS.play;
+  activeTab = HUB_TABS[name] ? name : "play";
+  hideAll();
+  setHubChrome(true);
+  $(tab.screen).classList.remove("hidden");
+  document.querySelectorAll("#tabbar .tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tab === activeTab);
+  });
+  if (activeTab === "parts") markPartsSeen();
+  tab.render?.();
+  refreshMenu();
+  updateBadges();
 }
 
 function applyProfile(next) {
   profile = next;
   game.profile = next;
   refreshMenu();
+  updateBadges();
 }
 
 ui.applyProfile = applyProfile;
@@ -228,24 +261,87 @@ function refreshMenu() {
   $("menu-account").textContent = String(profile?.accountLevel || 1);
   $("menu-coins").textContent = String(profile?.coins || 0);
   $("menu-crystals").textContent = String(profile?.crystals || 0);
+  const furthest = furthestOpenLevel();
+  $("btn-play").textContent = `В БОЙ · УРОВЕНЬ ${furthest}`;
+  const tester = !!profile?.tester;
+  $("btn-coop").hidden = !tester;
+  $("btn-dev").hidden = !tester;
+}
+
+function furthestOpenLevel() {
+  const cleared = new Set(profile?.clearedLevels || []);
+  let level = 1;
+  while (level < FURTHEST_LEVEL && cleared.has(level)) level += 1;
+  return level;
+}
+
+function seenPartIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SEEN_PARTS_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function markPartsSeen() {
+  const ids = (profile?.parts || []).map((p) => p.id);
+  localStorage.setItem(SEEN_PARTS_KEY, JSON.stringify(ids));
+}
+
+function hasNewParts() {
+  const seen = seenPartIds();
+  return (profile?.parts || []).some((p) => !seen.has(p.id));
+}
+
+function updateBadges() {
+  const coins = profile?.coins || 0;
+  const crystals = profile?.crystals || 0;
+  const hangarReady = META_UPGRADES.some((u) => coins >= upgradeCost(profile?.hangar?.[u.key] || 0));
+  const owned = new Set(profile?.weapons || []);
+  const shopReady =
+    crystals >= 20 ||
+    (crystals >= 25 && (profile?.critBonus || 0) < 10) ||
+    (crystals >= 40 && SHOP_WEAPONS.some((id) => !owned.has(id))) ||
+    (crystals >= 50 && !profile?.fourthCard);
+  const tasksReady =
+    (profile?.dailies || []).some((t) => t.done && !t.claimed) ||
+    (profile?.achievements || []).some((a) => a.ready && !a.claimed);
+  toggleBadge("badge-hangar", hangarReady);
+  toggleBadge("badge-parts", hasNewParts() && activeTab !== "parts");
+  toggleBadge("badge-shop", shopReady);
+  toggleBadge("badge-tasks", tasksReady);
+}
+
+function toggleBadge(id, on) {
+  const el = $(id);
+  if (el) el.classList.toggle("hidden", !on);
 }
 
 function showLogin(message) {
   hideAll();
+  setHubChrome(false);
   $("login-error").textContent = message || "";
   $("screen-login").classList.remove("hidden");
 }
 
 function showMenu() {
-  hideAll();
-  $("screen-menu").classList.remove("hidden");
-  refreshMenu();
+  showTab("play");
   retryPendingClaims(applyProfile);
   retryPendingPartRolls(game);
-  if (!meta.seenHow) {
-    hideAll();
-    $("screen-how").classList.remove("hidden");
-  }
+  maybePromptSave();
+}
+
+function maybePromptSave() {
+  if (!profile?.isGuest) return;
+  if (localStorage.getItem(SAVE_PROMPT_KEY)) return;
+  if (!(profile?.clearedLevels || []).length) return;
+  localStorage.setItem(SAVE_PROMPT_KEY, "1");
+  openSaveScreen();
+}
+
+function renderTasks() {
+  renderDailies();
+  renderAchievements();
 }
 
 async function purchase(action, rerender) {
@@ -359,6 +455,9 @@ function renderShop() {
   $("shop-list").querySelectorAll("button").forEach((btn) => {
     btn.onclick = () => purchase(rows[Number(btn.dataset.index)].run, renderShop);
   });
+  const poor = crystals < 20;
+  $("btn-chest-open").disabled = poor;
+  $("btn-chest-open").textContent = poor ? "НУЖНО 20" : "ОТКРЫТЬ";
 }
 
 function renderDailies() {
@@ -408,12 +507,6 @@ function dropText(drop) {
   if (drop.kind === "crit") return `+${drop.amount}% крита`;
   if (drop.kind === "card") return `Карта: ${drop.card}`;
   return "";
-}
-
-function renderChest() {
-  const poor = (profile?.crystals || 0) < 20;
-  $("btn-chest-open").disabled = poor;
-  $("btn-chest-open").textContent = poor ? "НУЖНО 20" : "ОТКРЫТЬ";
 }
 
 const LEVEL_CRYSTALS = { 1: 8, 2: 12, 3: 20 };
@@ -507,10 +600,18 @@ $("btn-coop-join").onclick = () => {
 };
 $("btn-play").onclick = () => {
   if (!api.token()) return;
+  beginBattle(furthestOpenLevel());
+};
+$("btn-pick-level").onclick = () => {
+  if (!api.token()) return;
   openScreen("screen-levels");
   renderLevels();
 };
 $("btn-levels-back").onclick = () => showMenu();
+document.querySelectorAll("#tabbar .tab").forEach((btn) => {
+  btn.onclick = () => showTab(btn.dataset.tab);
+});
+$("btn-gear").onclick = () => openSettings();
 
 async function enter(mode) {
   const name = $("login-name").value.trim();
@@ -527,21 +628,11 @@ async function enter(mode) {
 
 $("btn-login").onclick = () => enter("login");
 $("btn-register").onclick = () => enter("register");
-$("btn-hangar").onclick = () => {
-  openScreen("screen-hangar");
-  renderHangar();
-};
-$("btn-hangar-back").onclick = () => showMenu();
-$("btn-parts").onclick = () => {
-  openScreen("screen-parts");
-  renderParts();
-};
-$("btn-parts-back").onclick = () => showMenu();
 $("btn-dev").onclick = () => {
   openScreen("screen-dev");
   $("dev-crystals").textContent = String(profile?.crystals || 0);
 };
-$("btn-dev-back").onclick = () => showMenu();
+$("btn-dev-back").onclick = () => showTab("play");
 $("btn-dev-crystals").onclick = () => {
   purchase(async () => {
     const result = await api.devCrystals(100);
@@ -560,62 +651,61 @@ for (const rarity of ["common", "rare", "epic", "legendary"]) {
     });
   };
 }
-$("btn-shop").onclick = () => {
-  openScreen("screen-shop");
-  renderShop();
-};
-$("btn-shop-back").onclick = () => showMenu();
-$("btn-chest").onclick = () => {
-  openScreen("screen-chest");
-  $("chest-result").textContent = "";
-  renderChest();
-};
 $("btn-chest-open").onclick = async () => {
   $("btn-chest-open").disabled = true;
-  const result = await purchase(() => api.openChest(newId()), renderChest);
+  const result = await purchase(() => api.openChest(newId()), renderShop);
   if (result?.drop) $("chest-result").textContent = dropText(result.drop);
-  renderChest();
-};
-$("btn-chest-back").onclick = () => showMenu();
-$("btn-dailies").onclick = () => {
-  openScreen("screen-dailies");
-  renderDailies();
-};
-$("btn-dailies-back").onclick = () => showMenu();
-$("btn-achievements").onclick = () => {
-  openScreen("screen-achievements");
-  renderAchievements();
-};
-$("btn-achievements-back").onclick = () => showMenu();
-$("btn-how").onclick = () => {
-  hideAll();
-  $("screen-how").classList.remove("hidden");
+  renderShop();
 };
 function refreshSettings() {
   const on = meta.showDamage !== false;
   const btn = $("btn-damage-toggle");
   btn.textContent = on ? "ПОКАЗ УРОНА: ВКЛ" : "ПОКАЗ УРОНА: ВЫКЛ";
   btn.classList.toggle("primary", on);
+  $("btn-save-progress").hidden = !profile?.isGuest;
 }
-$("btn-settings").onclick = () => {
-  hideAll();
+function openSettings() {
+  openScreen("screen-settings");
   refreshSettings();
-  $("screen-settings").classList.remove("hidden");
-};
+}
+function openSaveScreen() {
+  openScreen("screen-save");
+  $("save-name").value = "";
+  $("save-password").value = "";
+  $("save-error").textContent = "";
+}
 $("btn-damage-toggle").onclick = () => {
   meta.showDamage = meta.showDamage === false;
   ui.save();
   refreshSettings();
 };
-$("btn-settings-back").onclick = () => {
+$("btn-how").onclick = () => showMenu();
+$("btn-how2").onclick = () => {
   hideAll();
-  $("screen-menu").classList.remove("hidden");
+  setHubChrome(false);
+  $("screen-how").classList.remove("hidden");
 };
+$("btn-save-progress").onclick = () => openSaveScreen();
+$("btn-save-back").onclick = () => showMenu();
+$("btn-save-confirm").onclick = async () => {
+  const name = $("save-name").value.trim();
+  const password = $("save-password").value;
+  $("save-error").textContent = "";
+  try {
+    const result = await api.saveAccount(name, password);
+    applyProfile(result.profile);
+    ui.toast("Прогресс сохранён");
+    showMenu();
+  } catch (error) {
+    $("save-error").textContent = error.message || "Не вышло сохранить";
+  }
+};
+$("btn-login-other").onclick = () => showLogin();
+$("btn-settings-back").onclick = () => showMenu();
 $("btn-how-back").onclick = () => {
   meta.seenHow = true;
   ui.save();
-  hideAll();
-  $("screen-menu").classList.remove("hidden");
+  showMenu();
 };
 $("btn-reroll").onclick = async () => {
   const btn = $("btn-reroll");
@@ -649,8 +739,15 @@ $("btn-result-menu").onclick = () => {
 
 async function boot() {
   if (!api.token()) {
-    showLogin();
-    return;
+    try {
+      const guest = await api.guest();
+      applyProfile(guest.profile);
+      showMenu();
+      return;
+    } catch (error) {
+      showLogin(error.message || "");
+      return;
+    }
   }
   try {
     const me = await api.me();

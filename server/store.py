@@ -31,6 +31,15 @@ MOSCOW = ZoneInfo("Europe/Moscow")
 DEFAULT_LOADOUT_JSON = "[null,null,null,null,null,null,null,null]"
 ENDLESS_PART_CHANCE = 0.30
 ENDLESS_PART_EVERY = 5
+LEVEL_PART_CHANCE = 0.40
+LEVEL_PART_PITY = 3
+TESTERS = {"sharon"}
+GUESTS_PER_IP_PER_DAY = 20
+EVENT_RETENTION_DAYS = 90
+
+
+def is_tester_name(name):
+    return str(name or "").strip().lower() in TESTERS
 
 
 def moscow_day(now):
@@ -155,10 +164,37 @@ class Store:
                 part_id TEXT NOT NULL,
                 PRIMARY KEY (account_id, roll_key)
             );
+            CREATE TABLE IF NOT EXISTS guest_ips (
+                ip TEXT NOT NULL,
+                day TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (ip, day)
+            );
+            CREATE TABLE IF NOT EXISTS run_events (
+                run_id TEXT NOT NULL,
+                account_id INTEGER NOT NULL,
+                is_tester INTEGER NOT NULL DEFAULT 0,
+                is_guest INTEGER NOT NULL DEFAULT 0,
+                started_at TEXT,
+                ended_at TEXT,
+                start_level INTEGER,
+                outcome TEXT,
+                end_level INTEGER,
+                end_wave INTEGER,
+                duration REAL,
+                kills INTEGER,
+                weapons_json TEXT,
+                parts_json TEXT,
+                cards_json TEXT,
+                branches_json TEXT,
+                legendaries_json TEXT,
+                PRIMARY KEY (run_id, account_id)
+            );
             """
         )
         self._ensure_column("accounts", "loadout_json", f"TEXT NOT NULL DEFAULT '{DEFAULT_LOADOUT_JSON}'")
         self._ensure_column("accounts", "parts_dry", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column("accounts", "is_guest", "INTEGER NOT NULL DEFAULT 0")
         self.db.commit()
 
     def _ensure_column(self, table, column, definition):
@@ -199,6 +235,69 @@ class Store:
     def account_for_token(self, token):
         row = self._account_row(token)
         return self._profile(row["id"])
+
+    def create_guest(self, ip, now=None):
+        now = now or datetime.now(timezone.utc)
+        day = moscow_day(now)
+        ip = (ip or "").strip() or "unknown"
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute(
+                "SELECT count FROM guest_ips WHERE ip = ? AND day = ?",
+                (ip, day),
+            ).fetchone()
+            used = int(row["count"]) if row else 0
+            if used >= GUESTS_PER_IP_PER_DAY:
+                raise ValueError("Слишком много новых аккаунтов, попробуй позже")
+            for _ in range(20):
+                name = f"Гость-{secrets.randbelow(9000) + 1000}"
+                exists = self.db.execute(
+                    "SELECT 1 FROM accounts WHERE name = ?", (name,)
+                ).fetchone()
+                if not exists:
+                    break
+            else:
+                raise ValueError("Не вышло создать гостя")
+            salt = secrets.token_bytes(16)
+            digest = hashlib.pbkdf2_hmac("sha256", secrets.token_hex(16).encode(), salt, 200000)
+            cur = self.db.execute(
+                "INSERT INTO accounts (name, password, is_guest) VALUES (?, ?, 1)",
+                (name, f"{salt.hex()}${digest.hex()}"),
+            )
+            self.db.execute(
+                "INSERT INTO guest_ips (ip, day, count) VALUES (?, ?, 1) "
+                "ON CONFLICT(ip, day) DO UPDATE SET count = count + 1",
+                (ip, day),
+            )
+            account_id = cur.lastrowid
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        token = self._new_session(account_id)
+        return {"token": token, "profile": self._profile(account_id)}
+
+    def save_account(self, token, name, password):
+        row = self._account_row(token)
+        if not row["is_guest"]:
+            raise ValueError("Аккаунт уже сохранён")
+        name = (name or "").strip()
+        if not name or len(name) > 24:
+            raise ValueError("Имя от 1 до 24 символов")
+        if not isinstance(password, str) or len(password) < 4:
+            raise ValueError("Пароль слишком короткий")
+        salt = secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200000)
+        try:
+            self.db.execute(
+                "UPDATE accounts SET name = ?, password = ?, is_guest = 0 WHERE id = ?",
+                (name, f"{salt.hex()}${digest.hex()}", row["id"]),
+            )
+            self.db.commit()
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise ValueError("Имя уже занято") from exc
+        return {"profile": self._profile(row["id"])}
 
     def claim_run(self, token, facts, now):
         account_id = self._account_row(token)["id"]
@@ -540,7 +639,9 @@ class Store:
         return {"card": card, "profile": self._profile(account_id)}
 
     def roll_part(self, token, run_id, kind, level, wave, rng, roller=None):
-        account_id = self._account_row(token)["id"]
+        row = self._account_row(token)
+        account_id = row["id"]
+        tester = is_tester_name(row["name"])
         run_id = str(run_id or "").strip()
         kind = str(kind or "").strip()
         if not run_id:
@@ -579,7 +680,14 @@ class Store:
 
             drop = False
             if kind == "level":
-                drop = True
+                dry = int(row["parts_dry"] or 0)
+                if tester or dry >= LEVEL_PART_PITY or rng() < LEVEL_PART_CHANCE:
+                    drop = True
+                else:
+                    self._record_roll_miss(account_id, roll_key, kind="level")
+                    profile = self._profile(account_id)
+                    self.db.commit()
+                    return {"part": None, "profile": profile}
             elif rng() < ENDLESS_PART_CHANCE:
                 drop = True
             else:
@@ -611,10 +719,13 @@ class Store:
         return {"part": part, "profile": profile}
 
     def dev_crystals(self, token, amount=100):
+        row = self._account_row(token)
+        if not is_tester_name(row["name"]):
+            raise ValueError("Нет доступа")
         amount = int(amount or 100)
         if amount < 1 or amount > 1000:
             raise ValueError("Некорректная сумма")
-        account_id = self._account_row(token)["id"]
+        account_id = row["id"]
         self.db.execute(
             "UPDATE accounts SET crystals = crystals + ? WHERE id = ?",
             (amount, account_id),
@@ -623,10 +734,13 @@ class Store:
         return {"granted": amount, "profile": self._profile(account_id)}
 
     def dev_part(self, token, rarity, rng, roller=None):
+        row = self._account_row(token)
+        if not is_tester_name(row["name"]):
+            raise ValueError("Нет доступа")
         rarity = str(rarity or "").strip()
         if rarity not in ("common", "rare", "epic", "legendary"):
             raise ValueError("Некорректная редкость")
-        account_id = self._account_row(token)["id"]
+        account_id = row["id"]
         owned = list(self._owned_weapon_families(account_id))
         part_id = secrets.token_hex(16)
         if roller is None:
@@ -693,6 +807,165 @@ class Store:
             self.db.rollback()
             raise
         return {"profile": profile}
+
+    def record_run_start(self, token, body, now=None):
+        row = self._account_row(token)
+        now = (now or datetime.now(timezone.utc)).isoformat()
+        run_id = str((body or {}).get("runId") or "").strip()
+        if not run_id:
+            raise ValueError("Нет номера забега")
+        self.db.execute(
+            """
+            INSERT INTO run_events (
+                run_id, account_id, is_tester, is_guest, started_at,
+                start_level, weapons_json, parts_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id, account_id) DO NOTHING
+            """,
+            (
+                run_id,
+                row["id"],
+                1 if is_tester_name(row["name"]) else 0,
+                1 if row["is_guest"] else 0,
+                now,
+                _as_int(body.get("level")),
+                json.dumps(body.get("weapons") or [], ensure_ascii=False),
+                json.dumps(body.get("parts") or [], ensure_ascii=False),
+            ),
+        )
+        self.db.commit()
+        return {"ok": True}
+
+    def record_run_end(self, token, body, now=None):
+        row = self._account_row(token)
+        now = (now or datetime.now(timezone.utc)).isoformat()
+        body = body or {}
+        run_id = str(body.get("runId") or "").strip()
+        if not run_id:
+            raise ValueError("Нет номера забега")
+        outcome = str(body.get("outcome") or "").strip()
+        if outcome not in ("died", "cleared", "quit"):
+            raise ValueError("Некорректный итог")
+        self.db.execute(
+            """
+            INSERT INTO run_events (
+                run_id, account_id, is_tester, is_guest, started_at, ended_at,
+                outcome, end_level, end_wave, duration, kills,
+                cards_json, branches_json, legendaries_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id, account_id) DO UPDATE SET
+                ended_at = excluded.ended_at,
+                outcome = excluded.outcome,
+                end_level = excluded.end_level,
+                end_wave = excluded.end_wave,
+                duration = excluded.duration,
+                kills = excluded.kills,
+                cards_json = excluded.cards_json,
+                branches_json = excluded.branches_json,
+                legendaries_json = excluded.legendaries_json
+            WHERE run_events.ended_at IS NULL
+            """,
+            (
+                run_id,
+                row["id"],
+                1 if is_tester_name(row["name"]) else 0,
+                1 if row["is_guest"] else 0,
+                now,
+                now,
+                outcome,
+                _as_int(body.get("level")),
+                _as_int(body.get("wave")),
+                _as_float(body.get("duration")),
+                _as_int(body.get("kills")),
+                json.dumps(body.get("cards") or [], ensure_ascii=False),
+                json.dumps(body.get("branches") or {}, ensure_ascii=False),
+                json.dumps(body.get("legendaries") or [], ensure_ascii=False),
+            ),
+        )
+        self.db.commit()
+        return {"ok": True}
+
+    def purge_old_events(self, now=None):
+        now = now or datetime.now(timezone.utc)
+        cutoff = (now - timedelta(days=EVENT_RETENTION_DAYS)).isoformat()
+        self.db.execute(
+            "DELETE FROM run_events WHERE COALESCE(ended_at, started_at) < ?",
+            (cutoff,),
+        )
+        self.db.commit()
+
+    def stats_summary(self, days=7, now=None):
+        now = now or datetime.now(timezone.utc)
+        where = "is_tester = 0"
+        params = []
+        if days != "all":
+            cutoff = (now - timedelta(days=int(days))).isoformat()
+            where += " AND COALESCE(started_at, ended_at) >= ?"
+            params.append(cutoff)
+        rows = self.db.execute(
+            f"SELECT * FROM run_events WHERE {where}", params
+        ).fetchall()
+
+        by_day = {}
+        deaths = {}
+        weapon_branches = {}
+        cards = {}
+        legendaries = {}
+        durations = []
+        started = 0
+        ended = 0
+        abandoned = 0
+        cleared_any = 0
+        for row in rows:
+            started += 1
+            stamp = row["started_at"] or row["ended_at"] or ""
+            day = stamp[:10]
+            if day:
+                by_day[day] = by_day.get(day, 0) + 1
+            if row["ended_at"] is None:
+                abandoned += 1
+                continue
+            ended += 1
+            if row["outcome"] == "died":
+                key = f"{row['end_level']}-{row['end_wave']}"
+                deaths[key] = deaths.get(key, 0) + 1
+            if row["outcome"] == "cleared" or (row["end_level"] or 0) > (row["start_level"] or 1):
+                cleared_any += 1
+            if row["duration"] is not None:
+                durations.append(row["duration"])
+            for weapon, branch in json.loads(row["branches_json"] or "{}").items():
+                bucket = weapon_branches.setdefault(weapon, {})
+                bucket[branch] = bucket.get(branch, 0) + 1
+            for card in json.loads(row["cards_json"] or "[]"):
+                name = card.get("title") if isinstance(card, dict) else card
+                if name:
+                    cards[name] = cards.get(name, 0) + 1
+            for name in json.loads(row["legendaries_json"] or "[]"):
+                legendaries[name] = legendaries.get(name, 0) + 1
+
+        guests = self.db.execute(
+            "SELECT COUNT(*) AS n FROM accounts WHERE is_guest = 1"
+        ).fetchone()["n"]
+        saved = self.db.execute(
+            "SELECT COUNT(*) AS n FROM accounts WHERE is_guest = 0"
+        ).fetchone()["n"]
+        avg_duration = round(sum(durations) / len(durations), 1) if durations else 0
+        top_cards = sorted(cards.items(), key=lambda kv: kv[1], reverse=True)[:15]
+        return {
+            "days": days,
+            "runs": started,
+            "ended": ended,
+            "abandoned": abandoned,
+            "clearRate": round(cleared_any / ended, 3) if ended else 0,
+            "avgDuration": avg_duration,
+            "byDay": dict(sorted(by_day.items())),
+            "deaths": dict(sorted(deaths.items())),
+            "weaponBranches": weapon_branches,
+            "legendaries": dict(sorted(legendaries.items(), key=lambda kv: kv[1], reverse=True)),
+            "topCards": top_cards,
+            "guests": guests,
+            "saved": saved,
+        }
 
     def _new_session(self, account_id):
         token = secrets.token_hex(32)
@@ -774,6 +1047,8 @@ class Store:
             "parts": self._parts_list(account_id),
             "loadout": json.loads(row["loadout_json"] or DEFAULT_LOADOUT_JSON),
             "partsDry": int(row["parts_dry"] or 0),
+            "tester": is_tester_name(row["name"]),
+            "isGuest": bool(row["is_guest"]),
         }
 
     def _parts_list(self, account_id):
@@ -908,6 +1183,20 @@ class Store:
             """,
             (kill_count, wave3, level_clear, account_id, day),
         )
+
+
+def _as_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _password_ok(stored, password):

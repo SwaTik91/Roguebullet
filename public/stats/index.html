@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PolySpire · статистика</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #10141a; color: #e7eef6; }
+    main { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 48px; }
+    h1 { font-size: 24px; margin: 0 0 4px; }
+    h2 { margin: 24px 0 8px; border-top: 1px solid #24303a; padding-top: 16px; }
+    .muted { color: #9aa8b5; }
+    .cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+    .card { flex: 1 1 140px; background: #171d25; border-radius: 12px; padding: 12px 14px; }
+    .card b { display: block; font-size: 22px; font-family: Orbitron, system-ui, sans-serif; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; }
+    th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #24303a; }
+    th { color: #9aa8b5; font-weight: 600; }
+    button { background: #1c2530; color: #cfe9ff; border: 1px solid #2a4450; border-radius: 999px; padding: 6px 14px; margin-right: 8px; }
+    button.active { background: #2a4450; color: #fff; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Статистика PolySpire</h1>
+    <p class="muted">Без имён игроков. Тестовые забеги не учитываются.</p>
+    <div>
+      <button data-days="7" class="active">7 дней</button>
+      <button data-days="all">Всё время</button>
+    </div>
+    <div id="content"><p class="muted">Загрузка…</p></div>
+  </main>
+  <script>
+    const API = (localStorage.getItem("roguebullet-api") || "http://157.22.230.112:8080");
+    const content = document.getElementById("content");
+    let days = "7";
+
+    function esc(v) {
+      return String(v).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    }
+
+    function rows(pairs) {
+      if (!pairs.length) return "<tr><td class='muted'>Пусто</td><td></td></tr>";
+      return pairs.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+    }
+
+    function branchTable(weaponBranches) {
+      const keys = Object.keys(weaponBranches);
+      if (!keys.length) return "<p class='muted'>Пока нет данных о ветках.</p>";
+      return keys.map((weapon) => {
+        const inner = Object.entries(weaponBranches[weapon]).sort((a, b) => b[1] - a[1]);
+        return `<h3>${esc(weapon)}</h3><table><tbody>${rows(inner)}</tbody></table>`;
+      }).join("");
+    }
+
+    async function load() {
+      content.innerHTML = "<p class='muted'>Загрузка…</p>";
+      try {
+        const res = await fetch(`${API}/stats/summary?days=${days}`);
+        const s = await res.json();
+        content.innerHTML = `
+          <div class="cards">
+            <div class="card"><span class="muted">Забегов</span><b>${s.runs}</b></div>
+            <div class="card"><span class="muted">Завершено</span><b>${s.ended}</b></div>
+            <div class="card"><span class="muted">Брошено</span><b>${s.abandoned}</b></div>
+            <div class="card"><span class="muted">Доля с пройденным уровнем</span><b>${Math.round((s.clearRate || 0) * 100)}%</b></div>
+            <div class="card"><span class="muted">Средняя длина, с</span><b>${s.avgDuration}</b></div>
+            <div class="card"><span class="muted">Гостей</span><b>${s.guests}</b></div>
+            <div class="card"><span class="muted">Сохранённых</span><b>${s.saved}</b></div>
+          </div>
+          <h2>Забеги по дням</h2>
+          <table><tbody>${rows(Object.entries(s.byDay))}</tbody></table>
+          <h2>Смерти по уровням и волнам</h2>
+          <table><thead><tr><th>Уровень-волна</th><th>Смертей</th></tr></thead><tbody>${rows(Object.entries(s.deaths))}</tbody></table>
+          <h2>Ветки по оружию</h2>
+          ${branchTable(s.weaponBranches || {})}
+          <h2>Легендарки</h2>
+          <table><tbody>${rows(Object.entries(s.legendaries || {}))}</tbody></table>
+          <h2>Частые карты</h2>
+          <table><tbody>${rows(s.topCards || [])}</tbody></table>
+        `;
+      } catch (err) {
+        content.innerHTML = `<p class="muted">Не удалось загрузить: ${esc(err.message || err)}</p>`;
+      }
+    }
+
+    document.querySelectorAll("button[data-days]").forEach((btn) => {
+      btn.onclick = () => {
+        days = btn.dataset.days;
+        document.querySelectorAll("button[data-days]").forEach((b) => b.classList.toggle("active", b === btn));
+        load();
+      };
+    });
+    load();
+  </script>
+</body>
+</html>

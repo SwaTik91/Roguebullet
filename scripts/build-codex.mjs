@@ -180,7 +180,7 @@ function page() {
   for (let level = 1; level <= 20; level++) {
     const next = gunXpToNext(level);
     if (!next) break;
-    xpRows.push(`<tr><td>${level}</td><td>${next}</td><td>${OFFER_XP_MULT === 1 ? next : Math.ceil(next / OFFER_XP_MULT)}</td></tr>`);
+    xpRows.push(`<tr><td>${level}</td><td>${next}</td><td>${Math.ceil(next / OFFER_XP_MULT)}</td></tr>`);
   }
   const hangarRows = [];
   for (let level = 0; level < 8; level++) hangarRows.push(`<tr><td>${level} → ${level + 1}</td><td>${upgradeCost(level)}</td></tr>`);
@@ -196,10 +196,7 @@ function page() {
       `<tr><td>${wave}</td><td>${waveCount(wave)}</td><td>${esc(name)}</td><td>${Math.round(enemy.hp)}</td><td>${Math.round(enemy.dmg)}</td><td>${endlessEnemyWave(wave)}</td></tr>`,
     );
   }
-  const xpNote =
-    OFFER_XP_MULT === 1
-      ? "Опыт копится как в таблице."
-      : `Сейчас опыт копится в ${OFFER_XP_MULT} раза быстрее. Это временный множитель для теста.`;
+  const xpNote = `Опыт улучшений копится как в таблице. У тестовых аккаунтов он идёт в ${OFFER_XP_MULT} раз быстрее.`;
   const weapons = WEAPONS.map((weapon) => weaponSection(weapon, groups)).join("");
   const nav = [
     ...WEAPONS.map((weapon) => `<a href="#w-${weapon.id}">${esc(WEAPON_INFO[weapon.id].name)}</a>`),
@@ -269,7 +266,7 @@ function page() {
     </section>
     <section id="xp"><h2>Опыт улучшений</h2>
       <p>${esc(xpNote)} Потолок темпа пулемёта ${GUN_RATE_CAP}. Потолок шанса крита ${Math.round(GUN_CRIT_CAP * 100)}%.</p>
-      <table><thead><tr><th>Уровень</th><th>Опыт до следующего</th><th>Убийств при текущем множителе</th></tr></thead><tbody>${xpRows.join("")}</tbody></table>
+      <table><thead><tr><th>Уровень</th><th>Опыт до следующего</th><th>Убийств у тестового аккаунта (×${OFFER_XP_MULT})</th></tr></thead><tbody>${xpRows.join("")}</tbody></table>
     </section>
     <section id="drive"><h2>Овердрайв и резонанс форм</h2>
       <p>Овердрайв копит ${OVERDRIVE.shotGain} за выстрел. Уровень конденсатора умножает набор на 1 + уровень × ${OVERDRIVE.hangarRate}. Потолок ${OVERDRIVE.max}. Длительность ${OVERDRIVE.dur} с, урон ×${OVERDRIVE.mul}. Стартовый заряд: ${OVERDRIVE.startPerHangar} за уровень конденсатора. Базовый шанс крита ${Math.round(CRIT_START.chance * 100)}%, крит ×${CRIT_START.mul}.</p>
