@@ -188,6 +188,7 @@ class Store:
                 cards_json TEXT,
                 branches_json TEXT,
                 legendaries_json TEXT,
+                damage_json TEXT,
                 PRIMARY KEY (run_id, account_id)
             );
             """
@@ -195,6 +196,7 @@ class Store:
         self._ensure_column("accounts", "loadout_json", f"TEXT NOT NULL DEFAULT '{DEFAULT_LOADOUT_JSON}'")
         self._ensure_column("accounts", "parts_dry", "INTEGER NOT NULL DEFAULT 0")
         self._ensure_column("accounts", "is_guest", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column("run_events", "damage_json", "TEXT")
         self.db.commit()
 
     def _ensure_column(self, table, column, definition):
@@ -851,8 +853,8 @@ class Store:
             INSERT INTO run_events (
                 run_id, account_id, is_tester, is_guest, started_at, ended_at,
                 outcome, end_level, end_wave, duration, kills,
-                cards_json, branches_json, legendaries_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                cards_json, branches_json, legendaries_json, damage_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id, account_id) DO UPDATE SET
                 ended_at = excluded.ended_at,
                 outcome = excluded.outcome,
@@ -862,7 +864,8 @@ class Store:
                 kills = excluded.kills,
                 cards_json = excluded.cards_json,
                 branches_json = excluded.branches_json,
-                legendaries_json = excluded.legendaries_json
+                legendaries_json = excluded.legendaries_json,
+                damage_json = excluded.damage_json
             WHERE run_events.ended_at IS NULL
             """,
             (
@@ -880,6 +883,7 @@ class Store:
                 json.dumps(body.get("cards") or [], ensure_ascii=False),
                 json.dumps(body.get("branches") or {}, ensure_ascii=False),
                 json.dumps(body.get("legendaries") or [], ensure_ascii=False),
+                json.dumps(_clean_shares(body.get("damage")), ensure_ascii=False),
             ),
         )
         self.db.commit()
@@ -916,6 +920,8 @@ class Store:
         ended = 0
         abandoned = 0
         cleared_any = 0
+        damage_totals = {}
+        damage_runs = 0
         for row in rows:
             started += 1
             stamp = row["started_at"] or row["ended_at"] or ""
@@ -942,6 +948,11 @@ class Store:
                     cards[name] = cards.get(name, 0) + 1
             for name in json.loads(row["legendaries_json"] or "[]"):
                 legendaries[name] = legendaries.get(name, 0) + 1
+            shares = _clean_shares(json.loads(row["damage_json"] or "{}"))
+            if shares:
+                damage_runs += 1
+                for weapon, share in shares.items():
+                    damage_totals[weapon] = damage_totals.get(weapon, 0) + share
 
         guests = self.db.execute(
             "SELECT COUNT(*) AS n FROM accounts WHERE is_guest = 1"
@@ -951,6 +962,12 @@ class Store:
         ).fetchone()["n"]
         avg_duration = round(sum(durations) / len(durations), 1) if durations else 0
         top_cards = sorted(cards.items(), key=lambda kv: kv[1], reverse=True)[:15]
+        avg_damage = (
+            {weapon: round(total / damage_runs, 3) for weapon, total in damage_totals.items()}
+            if damage_runs
+            else {}
+        )
+        avg_damage = dict(sorted(avg_damage.items(), key=lambda kv: kv[1], reverse=True))
         return {
             "days": days,
             "runs": started,
@@ -963,6 +980,8 @@ class Store:
             "weaponBranches": weapon_branches,
             "legendaries": dict(sorted(legendaries.items(), key=lambda kv: kv[1], reverse=True)),
             "topCards": top_cards,
+            "avgDamage": avg_damage,
+            "damageRuns": damage_runs,
             "guests": guests,
             "saved": saved,
         }
@@ -1197,6 +1216,20 @@ def _as_float(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _clean_shares(value):
+    if not isinstance(value, dict):
+        return {}
+    cleaned = {}
+    for key, raw in value.items():
+        try:
+            share = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if share > 0:
+            cleaned[str(key)] = min(1.0, share)
+    return cleaned
 
 
 def _password_ok(stored, password):

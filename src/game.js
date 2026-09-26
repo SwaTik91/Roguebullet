@@ -1,4 +1,4 @@
-import { SHAPES, WEAPON_INFO, applyQueuedCard, endlessEnemyWave, enemyForWave, startingLoadout, waveCount } from "./content.js";
+import { SHAPES, WEAPON_INFO, applyQueuedCard, damageShares, endlessEnemyWave, enemyForWave, startingLoadout, waveCount } from "./content.js";
 import { rayEnd, reflectAngle } from "./laser.js";
 import { bulletShouldStop, gunStep, gunXpToNext, reflectBullet, rollGunShot } from "./gun.js";
 import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
@@ -86,6 +86,7 @@ export class Game {
     this.pointer = { down: false, x: 360, y: 200 };
     this.shake = 0;
     this.speed = 1;
+    this.paused = false;
     this.state = "boot";
     this.queuedCard = options.queuedCard || null;
     this.rollPart = options.rollPart ?? ((body) => api?.rollPart?.(body));
@@ -251,9 +252,11 @@ export class Game {
       wavePause: 1.2,
       won: false,
       usedCard: false,
+      dmgByWeapon: {},
     };
     applyBonuses(this.run, sumBonuses(profile.parts || [], profile.loadout || []));
     this.state = "play";
+    this.paused = false;
     this.ui.showPlay();
     this.syncDrones();
     this.queueWave();
@@ -296,6 +299,7 @@ export class Game {
       if (stats?.branch) branches[id] = stats.branch;
     }
     const kills = Object.values(run.kills || {}).reduce((a, b) => a + b, 0);
+    const damage = damageShares(run.dmgByWeapon || {});
     api
       .runEnd({
         runId: run.runId,
@@ -307,6 +311,7 @@ export class Game {
         cards: run.takenCards || [],
         branches,
         legendaries: run.takenLegendaries || [],
+        damage,
       })
       .catch(() => {});
   }
@@ -438,7 +443,13 @@ export class Game {
     return best;
   }
 
-  damage(e, amt, src, canCrit = true, forcedCrit = false) {
+  tagDamage(tag, amount) {
+    if (!tag || !(amount > 0) || !this.run) return;
+    const by = this.run.dmgByWeapon || (this.run.dmgByWeapon = {});
+    by[tag] = (by[tag] || 0) + amount;
+  }
+
+  damage(e, amt, src, canCrit = true, forcedCrit = false, tag = null) {
     if (e.dead) return false;
     let crit = false;
     if (canCrit && this.run.crit && (forcedCrit || this.rand() < this.run.crit.chance)) {
@@ -455,6 +466,7 @@ export class Game {
       return crit;
     }
     const dealt = amt;
+    this.tagDamage(tag, dealt);
     e.hp -= dealt;
     if (crit) {
       this.spark(e.x, e.y, "#ffe08a", 10);
@@ -547,7 +559,7 @@ export class Game {
     this.burst(x, y, "#c084fc", 26);
     for (const e of this.run.enemies) {
       if (!e.dead && dist(e, { x, y }) < RESONANCE_RADIUS) {
-        this.damage(e, RESONANCE_DMG + this.run.wave * RESONANCE_DMG_PER_WAVE, "#c084fc");
+        this.damage(e, RESONANCE_DMG + this.run.wave * RESONANCE_DMG_PER_WAVE, "#c084fc", true, false, "resonance");
       }
     }
     this.shake = 8;
@@ -673,6 +685,7 @@ export class Game {
         life: g.life || 1.15,
         color: over ? "#fff1b8" : "#7ee8ff",
         kind: "gun",
+        tag: "gun",
         hit: new Set(),
       });
     }
@@ -732,6 +745,7 @@ export class Game {
       life: 0.35,
       color: "#d7f7ff",
       kind: "gun",
+      tag: "gun",
       hit: new Set(),
     });
   }
@@ -764,10 +778,10 @@ export class Game {
         .sort((p, q) => dist({ x, y }, p) - dist({ x, y }, q));
       along.forEach((e, i) => {
         seen.add(e);
-        this.damage(e, power, "#60a5fa");
-        if (s.execute && !e.dead && e.hp / e.maxHp <= s.execute) this.damage(e, e.hp + 1, "#60a5fa", false);
-        if (s.burn) this.ignite(e, power * s.burn);
-        if (s.burn && s.burnSpread && along[i + 1]) this.ignite(along[i + 1], power * s.burn);
+        this.damage(e, power, "#60a5fa", true, false, "laser");
+        if (s.execute && !e.dead && e.hp / e.maxHp <= s.execute) this.damage(e, e.hp + 1, "#60a5fa", false, false, "laser");
+        if (s.burn) this.ignite(e, power * s.burn, "laser");
+        if (s.burn && s.burnSpread && along[i + 1]) this.ignite(along[i + 1], power * s.burn, "laser");
       });
       last = end;
       if (hop === bounces) break;
@@ -799,19 +813,20 @@ export class Game {
       if (e.dead || seen.has(e)) continue;
       if (pointLine(e.x, e.y, x1, y1, x2, y2) < width + e.r) {
         seen.add(e);
-        this.damage(e, dmg, "#60a5fa");
+        this.damage(e, dmg, "#60a5fa", true, false, "laser");
       }
     }
   }
 
   paintBeam(x1, y1, x2, y2, width, life, dps) {
-    const beam = { kind: "beam", x1, y1, x2, y2, life: Math.max(life, 0.46), color: "#7dd3fc", w: width, dps, tick: 0 };
+    const beam = { kind: "beam", x1, y1, x2, y2, life: Math.max(life, 0.46), color: "#7dd3fc", w: width, dps, tick: 0, tag: "laser" };
     this.run.fx.push(beam);
     if (life > 0.2) this.run.beams.push(beam);
   }
 
-  ignite(e, dps) {
+  ignite(e, dps, tag = "laser") {
     e.burn = Math.max(e.burn || 0, 1);
+    if (!e.burnDps || dps >= e.burnDps) e.burnTag = tag;
     e.burnDps = Math.max(e.burnDps || 0, dps);
   }
 
@@ -854,6 +869,7 @@ export class Game {
         life: !center && s.far ? 0.76 : 0.38,
         color: "#fbbf24",
         kind: "pellet",
+        tag: "scatter",
         bog: !!s.bog,
         cordon: !!s.cordon,
         cluster: !!s.cluster,
@@ -908,14 +924,14 @@ export class Game {
         y = fly.y;
         if (o.through && !fly.back) {
           for (const e of r.enemies) {
-            if (!e.dead && dist(e, fly) < e.r + 14) this.damage(e, o.dmg * dt * 10, "#34d399", false);
+            if (!e.dead && dist(e, fly) < e.r + 14) this.damage(e, o.dmg * dt * 10, "#34d399", false, false, "orb");
           }
         }
         if (!fly.hit && dist(fly, { x: fly.tx, y: fly.ty }) < 18) {
           fly.hit = true;
           const victim = this.nearest(fly);
           if (victim) {
-            this.damage(victim, o.dmg * (o.lungeMul || 8), "#34d399");
+            this.damage(victim, o.dmg * (o.lungeMul || 8), "#34d399", true, false, "orb");
             if (o.anchor && !victim.dead) fly.anchor = victim;
           }
           if (fly.hook) {
@@ -933,7 +949,7 @@ export class Game {
           fly.y = fly.anchor.y;
           x = fly.x;
           y = fly.y;
-          this.damage(fly.anchor, o.dmg * dt * 8, "#34d399", false);
+          this.damage(fly.anchor, o.dmg * dt * 8, "#34d399", false, false, "orb");
         } else if (fly.anchor) fly.back = true;
         if (fly.back && dist(fly, home) < 16) fly.done = true;
       }
@@ -944,8 +960,8 @@ export class Game {
         const touch = dist(e, { x, y }) < e.r + reach;
         const onRing = o.saw && Math.abs(dist(e, tw) - o.radius) < 16 + e.r;
         if (touch || onRing) {
-          this.damage(e, o.dmg * dt * (o.saw && onRing ? 6 : 8), "#34d399", false);
-          if (o.bleed) this.ignite(e, o.dmg * 4);
+          this.damage(e, o.dmg * dt * (o.saw && onRing ? 6 : 8), "#34d399", false, false, "orb");
+          if (o.bleed) this.ignite(e, o.dmg * 4, "orb");
           if (o.knock && o.branch === "ward") {
             const a = angTo(tw, e);
             e.x += Math.cos(a) * o.knock * dt;
@@ -965,7 +981,7 @@ export class Game {
       if (o.inner) {
         const inner = { x: tw.x + (home.x - tw.x) * 0.45, y: tw.y + (home.y - tw.y) * 0.45 };
         for (const e of r.enemies) {
-          if (!e.dead && dist(e, inner) < e.r + reach) this.damage(e, o.dmg * dt * 8, "#34d399", false);
+          if (!e.dead && dist(e, inner) < e.r + reach) this.damage(e, o.dmg * dt * 8, "#34d399", false, false, "orb");
         }
       }
     }
@@ -977,7 +993,7 @@ export class Game {
     return { x: tw.x + Math.cos(a) * o.radius, y: tw.y + Math.sin(a) * o.radius };
   }
 
-  burstPellets(x, y, n, dmg, life, pierce, again) {
+  burstPellets(x, y, n, dmg, life, pierce, again, tag = "scatter") {
     for (let i = 0; i < n; i++) {
       const a = (Math.PI * 2 * i) / n;
       this.run.bullets.push({
@@ -991,6 +1007,7 @@ export class Game {
         life,
         color: "#fde68a",
         kind: "pellet",
+        tag,
         cluster: again,
         shards: again ? 3 : 0,
         shardMul: 0.45,
@@ -1016,6 +1033,7 @@ export class Game {
       life: 0.85,
       color: "#fb7185",
       kind: "nade",
+      tag: "grenade",
       radius: s.radius,
       shape: s.shape || "",
       reach: s.reach || 1,
@@ -1075,7 +1093,7 @@ export class Game {
   }
 
   strikeEmp(e, s, tw, reach) {
-    this.damage(e, s.dmg, "#c084fc");
+    this.damage(e, s.dmg, "#c084fc", true, false, "emp");
     if (e.dead) return;
     const mul = s.slowMul ?? 0.45;
     const dur = s.slowDur || 1.15;
@@ -1116,7 +1134,7 @@ export class Game {
       if (!next || (s.chain !== "all" && best > 180)) break;
       hit.add(next);
       pool.push(next);
-      this.damage(next, s.dmg * 0.8, "#c084fc");
+      this.damage(next, s.dmg * 0.8, "#c084fc", true, false, "emp");
       this.run.fx.push({ kind: "beam", x1: from.x, y1: from.y, x2: next.x, y2: next.y, life: 0.12, color: "#e9d5ff", w: 3 });
     }
   }
@@ -1148,6 +1166,7 @@ export class Game {
         pull: b.pull,
         pit: b.pit,
         magma: b.magma,
+        tag: b.tag || "grenade",
       });
     }
     if (b.twin) this.fireGrenade(true);
@@ -1167,16 +1186,16 @@ export class Game {
       for (const e of this.run.enemies) {
         if (e.dead) continue;
         const rel = normAng(angTo(b, e) - a);
-        if (Math.abs(rel) < width && dist(b, e) < reach + e.r) this.damage(e, b.dmg, "#fb7185");
+        if (Math.abs(rel) < width && dist(b, e) < reach + e.r) this.damage(e, b.dmg, "#fb7185", true, false, b.tag || "grenade");
       }
     }
   }
 
-  explode(x, y, radius, dmg) {
+  explode(x, y, radius, dmg, tag = "grenade") {
     this.burst(x, y, "#fb7185", 18);
     this.audio.boom();
     for (const e of this.run.enemies) {
-      if (!e.dead && dist(e, { x, y }) < radius) this.damage(e, dmg, "#fb7185");
+      if (!e.dead && dist(e, { x, y }) < radius) this.damage(e, dmg, "#fb7185", true, false, tag);
     }
   }
 
@@ -1494,7 +1513,7 @@ export class Game {
       beam.tick = 0.2;
       for (const e of r.enemies) {
         if (e.dead) continue;
-        if (pointLine(e.x, e.y, beam.x1, beam.y1, beam.x2, beam.y2) < beam.w + e.r) this.damage(e, beam.dps * 0.2, "#60a5fa", false);
+        if (pointLine(e.x, e.y, beam.x1, beam.y1, beam.x2, beam.y2) < beam.w + e.r) this.damage(e, beam.dps * 0.2, "#60a5fa", false, false, beam.tag || "laser");
       }
     }
     r.beams = r.beams.filter((beam) => beam.life > 0);
@@ -1504,6 +1523,7 @@ export class Game {
       pool.life -= dt;
       for (const e of r.enemies) {
         if (e.dead || dist(e, pool) > pool.r) continue;
+        this.tagDamage(pool.tag, pool.dps * dt);
         e.hp -= pool.dps * dt;
         e.slow = Math.max(e.slow || 0, pool.resin ? 0.25 : 0.4);
         e.slowMul = 0.2;
@@ -1517,7 +1537,7 @@ export class Game {
           const x = e.x;
           const y = e.y;
           this.kill(e);
-          if (pool.magma) this.explode(x, y, 56, pool.dps);
+          if (pool.magma) this.explode(x, y, 56, pool.dps, pool.tag);
         }
       }
     }
@@ -1561,10 +1581,11 @@ export class Game {
               bombDmg: st.bombOnHit ? st.dmg * st.bombMul : 0,
               color: "#f472b6",
               kind: "gun",
+              tag: "drone",
               hit: new Set(),
             });
           }
-          if (st.bombs && !st.bombOnHit) this.explode(d.x, d.y + 10, st.radius, st.dmg * st.bombMul);
+          if (st.bombs && !st.bombOnHit) this.explode(d.x, d.y + 10, st.radius, st.dmg * st.bombMul, "drone");
           d.cd = st.cd;
         }
       });
@@ -1656,13 +1677,14 @@ export class Game {
 
       if (e.burn > 0) {
         e.burn -= dt;
+        this.tagDamage(e.burnTag || "laser", (e.burnDps || 0) * dt);
         e.hp -= (e.burnDps || 0) * dt;
         if (e.hp <= 0) {
           const x = e.x;
           const y = e.y;
           const boom = this.run.wepStats.laser?.ash ? e.burnDps : 0;
           this.kill(e);
-          if (boom) this.explode(x, y, 78, boom);
+          if (boom) this.explode(x, y, 78, boom, e.burnTag || "laser");
           continue;
         }
       }
@@ -1685,8 +1707,8 @@ export class Game {
           tw.hitCd = 0.35;
           hitCore.hitCd = 0.35;
           this.burst(hitCore.x, hitCore.y, "#34d399", 10);
-          if (orb?.reflect) this.damage(e, e.dmg * 3, "#34d399");
-          if (orb?.flash) this.explode(tw.x, tw.y, orb.radius, orb.dmg * 6);
+          if (orb?.reflect) this.damage(e, e.dmg * 3, "#34d399", true, false, "orb");
+          if (orb?.flash) this.explode(tw.x, tw.y, orb.radius, orb.dmg * 6, "orb");
           if (orb?.mend) tw.hp = Math.min(tw.maxHp, tw.hp + orb.mend);
           continue;
         }
@@ -1724,7 +1746,7 @@ export class Game {
       for (const e of r.enemies) {
         if (e.dead || b.hit.has(e)) continue;
         if (dist(b, e) < b.r + e.r) {
-          const crit = this.damage(e, b.dmg, b.color, true, !!b.guaranteedCrit);
+          const crit = this.damage(e, b.dmg, b.color, true, !!b.guaranteedCrit, b.tag);
           if (crit && b.canChain) r.gun.forceNext = true;
           if (b.knock) {
             const a = angTo(tw, e);
@@ -1735,11 +1757,11 @@ export class Game {
             e.slow = Math.max(e.slow || 0, 1);
             e.slowMul = b.cordon ? 0.05 : 0.12;
           }
-          if (b.cluster && b.shards && !e.dead) this.burstPellets(e.x, e.y, b.shards, b.dmg * (b.shardMul || 0.45), b.shardLife || 0.16, b.shardPierce || 0, !!b.echo);
-          if (b.avalanche && e.dead) this.burstPellets(e.x, e.y, b.shards || 4, b.dmg * 0.5, 0.2, 0, false);
+          if (b.cluster && b.shards && !e.dead) this.burstPellets(e.x, e.y, b.shards, b.dmg * (b.shardMul || 0.45), b.shardLife || 0.16, b.shardPierce || 0, !!b.echo, b.tag || "scatter");
+          if (b.avalanche && e.dead) this.burstPellets(e.x, e.y, b.shards || 4, b.dmg * 0.5, 0.2, 0, false, b.tag || "scatter");
           b.hit.add(e);
           if (bulletShouldStop(b)) {
-            if (b.bombRadius) this.explode(b.x, b.y, b.bombRadius, b.bombDmg);
+            if (b.bombRadius) this.explode(b.x, b.y, b.bombRadius, b.bombDmg, b.tag || "drone");
             b.life = 0;
             break;
           }
@@ -2162,7 +2184,8 @@ export class Game {
     }
     const dt = Math.min(0.033, (t - (this.last || t)) / 1000) * (this.speed || 1);
     this.last = t;
-    this.update(dt);
+    if (this.paused && this.state === "play") this.draw(0);
+    else this.update(dt);
     requestAnimationFrame((n) => this.loop(n));
   }
 

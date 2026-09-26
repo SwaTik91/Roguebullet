@@ -52,7 +52,18 @@
           <strong id="combo-text">△ × 3</strong>
         </div>
         <div id="weapons" class="weapons"></div>
+        <button id="btn-build" class="speed-btn build-btn" type="button">Билд</button>
         <button id="btn-speed" class="speed-btn" type="button">×1</button>
+      </div>
+
+      <div id="build-overlay" class="build-overlay hidden">
+        <div class="build-card">
+          <h2>СБОРКА</h2>
+          <div id="build-summary" class="build-summary"></div>
+          <div id="build-weapons" class="build-weapons"></div>
+          <div id="build-parts" class="build-parts"></div>
+          <button class="btn" id="btn-build-resume">ПРОДОЛЖИТЬ</button>
+        </div>
       </div>
 
       <div id="hub-top" class="hub-top hidden">
@@ -229,6 +240,7 @@
           <div><span>Монеты</span><b id="result-coins">0</b></div>
           <div><span>Кристаллы</span><b id="result-crystals">0</b></div>
         </div>
+        <div id="result-report" class="result-report hidden"></div>
         <button class="btn primary" id="btn-again">ЕЩЁ РАЗ</button>
         <button class="btn" id="btn-result-menu">В МЕНЮ</button>
       </div>

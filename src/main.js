@@ -2,7 +2,7 @@ import "./style.css";
 import { Game, WEAPON_INFO } from "./game.js";
 import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
-import { CRYSTAL_SHOP, META_UPGRADES } from "./content.js";
+import { CRYSTAL_SHOP, META_UPGRADES, damageShares, weaponColor, weaponLabel } from "./content.js";
 import { api, newId } from "./api.js";
 import { describeAffix, partFamilyLabel } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
@@ -22,6 +22,8 @@ const ui = {
   showPlay() {
     hideAll();
     $("hud").classList.remove("hidden");
+    $("build-overlay").classList.add("hidden");
+    $("result-report").classList.add("hidden");
     retryPendingClaims(applyProfile);
     retryPendingPartRolls(game);
   },
@@ -133,8 +135,10 @@ const ui = {
   },
   showResult(win, run, granted, extra = {}) {
     $("hud").classList.add("hidden");
+    $("build-overlay").classList.add("hidden");
     $("screen-result").classList.remove("hidden");
     $("result-title").textContent = win ? "ГЛАВА УДЕРЖАНА" : "ЯДРО ПАЛО";
+    renderReport(run);
     $("result-wave").textContent = String(run.level);
     const kills = run.kills && typeof run.kills === "object"
       ? Object.values(run.kills).reduce((sum, n) => sum + Number(n || 0), 0)
@@ -381,6 +385,121 @@ function partBlock(part) {
     .join("");
   const rarity = part.rarity || "common";
   return `<strong>${part.baseName || part.base}</strong><div class="sub rarity-${rarity}">${partFamilyLabel(part.family)} · ${PART_RARITY_LABELS[rarity] || rarity}</div>${affixLines}`;
+}
+
+const BRANCH_LABELS = {
+  queue: "Очередь", volley: "Залп", ricochet: "Рикошет",
+  cage: "Ступор", storm: "Разряд", dome: "Купол",
+  wedge: "Клин", cassette: "Кассета", crater: "Кратер",
+  wave: "Вал", sheaf: "Сноп", bunch: "Гроздь",
+  cut: "Резак", prism: "Призма", mirror: "Зеркало",
+  flock: "Стая", bomb: "Бомбы", hunt: "Охота",
+  blade: "Серп", ward: "Барьер", lunge: "Выпад",
+};
+const WEAPON_ORDER = ["gun", "laser", "scatter", "grenade", "emp", "orb", "drone"];
+
+function runWeaponEntries(run) {
+  const weapons = run.weapons || {};
+  const entries = [];
+  for (const id of WEAPON_ORDER) {
+    if (id !== "gun" && id !== "drone" && !weapons[id]) continue;
+    const stats = id === "gun" ? run.gun : id === "drone" ? run.drone : run.wepStats?.[id];
+    if (!stats) continue;
+    entries.push({ id, level: (run.pips?.[id] || []).length, branch: stats.branch || null });
+  }
+  return entries;
+}
+
+function cardsByWeaponLabel(run) {
+  const groups = {};
+  for (const c of run.takenCards || []) {
+    const key = c.weapon || "Общая карта";
+    (groups[key] = groups[key] || []).push(c.title);
+  }
+  return groups;
+}
+
+function equippedParts() {
+  const loadout = new Set((profile?.loadout || []).filter(Boolean));
+  return (profile?.parts || []).filter((p) => loadout.has(p.id));
+}
+
+function renderBuild() {
+  const run = game.run;
+  if (!run) return;
+  const g = run.gun || {};
+  const drive = run.overdrive || {};
+  const critPct = Math.round((run.crit?.chance || 0) * 100);
+  const hp = Math.max(0, Math.round(run.tower?.hp || 0));
+  const maxHp = Math.round(run.tower?.maxHp || 0);
+  const driveHot = drive.left > 0;
+  const drivePct = drive.max ? Math.round((drive.charge / drive.max) * 100) : 0;
+  $("build-summary").innerHTML = `
+    <div><span>Урон пулемёта</span><b>${Math.round(g.dmg || 0)}</b></div>
+    <div><span>Крит</span><b>${critPct}%</b></div>
+    <div><span>HP ядра</span><b>${hp}/${maxHp}</b></div>
+    <div><span>Овердрайв</span><b>${driveHot ? "активен" : `${drivePct}%`}</b></div>`;
+  const groups = cardsByWeaponLabel(run);
+  $("build-weapons").innerHTML = runWeaponEntries(run)
+    .map((e) => {
+      const label = weaponLabel(e.id);
+      const branch = e.branch ? ` · ${BRANCH_LABELS[e.branch] || e.branch}` : "";
+      const cards = (groups[label] || []).join(", ");
+      return `<div class="build-weapon"><div class="build-weapon-head"><b style="color:${weaponColor(e.id)}">${label}</b><span>ур. ${e.level}${branch}</span></div>${cards ? `<p>${cards}</p>` : ""}</div>`;
+    })
+    .join("");
+  const general = groups["Общая карта"] || [];
+  const parts = equippedParts();
+  const partHtml = parts.length
+    ? parts.map((p) => `<span class="build-part rarity-${p.rarity || "common"}">${p.baseName || p.base} · ${partFamilyLabel(p.family)}</span>`).join("")
+    : '<span class="sub">Нет надетых запчастей</span>';
+  $("build-parts").innerHTML = `${general.length ? `<div class="build-general"><b>Общие карты</b><p>${general.join(", ")}</p></div>` : ""}<div class="build-parts-list"><b>Запчасти</b><div>${partHtml}</div></div>`;
+}
+
+function openBuild() {
+  if (!game.run || game.state !== "play") return;
+  game.paused = true;
+  renderBuild();
+  $("build-overlay").classList.remove("hidden");
+}
+
+function closeBuild() {
+  $("build-overlay").classList.add("hidden");
+  if (game.state === "play") game.paused = false;
+}
+
+function renderReport(run) {
+  const box = $("result-report");
+  if (!box) return;
+  const shares = damageShares(run.dmgByWeapon || {});
+  const rows = Object.entries(shares).sort((a, b) => b[1] - a[1]);
+  const kills = run.kills && typeof run.kills === "object"
+    ? Object.values(run.kills).reduce((sum, n) => sum + Number(n || 0), 0)
+    : run.kills || 0;
+  const dur = Math.round((performance.now() - (run._startedAt || performance.now())) / 1000);
+  const durText = dur >= 60 ? `${Math.floor(dur / 60)} мин ${dur % 60} с` : `${dur} с`;
+  const bars = rows.length
+    ? rows
+        .map(([tag, share]) => {
+          const pct = Math.round(share * 100);
+          return `<div class="report-bar"><div class="report-bar-head"><span style="color:${weaponColor(tag)}">${weaponLabel(tag)}</span><b>${pct}%</b></div><div class="report-track"><i style="width:${pct}%;background:${weaponColor(tag)}"></i></div></div>`;
+        })
+        .join("")
+    : '<p class="sub">Урон не зафиксирован</p>';
+  const weakest = rows.length > 1 ? weaponLabel(rows[rows.length - 1][0]) : null;
+  const cards = (run.takenCards || []).map((c) => c.title);
+  box.innerHTML = `
+    <h3>Отчёт по бою</h3>
+    <div class="report-meta">
+      <div><span>Убито</span><b>${kills}</b></div>
+      <div><span>Время</span><b>${durText}</b></div>
+      <div><span>Уровень</span><b>${run.level}</b></div>
+      <div><span>Волна</span><b>${run.wave}</b></div>
+    </div>
+    <div class="report-bars">${bars}</div>
+    ${weakest ? `<p class="report-weak">Слабое звено: <b>${weakest}</b></p>` : ""}
+    ${cards.length ? `<div class="report-cards"><b>Карты забега</b><p>${cards.join(", ")}</p></div>` : ""}`;
+  box.classList.remove("hidden");
 }
 
 function renderParts() {
@@ -722,6 +841,11 @@ $("btn-speed").onclick = () => {
   game.speed = nextSpeed(game.speed || 1);
   $("btn-speed").textContent = speedLabel(game.speed);
 };
+$("btn-build").onclick = () => {
+  if ($("build-overlay").classList.contains("hidden")) openBuild();
+  else closeBuild();
+};
+$("btn-build-resume").onclick = () => closeBuild();
 $("btn-next-level").onclick = () => game.continueLevel();
 $("btn-endless").onclick = () => game.beginEndless();
 $("btn-clear-menu").onclick = () => {

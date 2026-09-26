@@ -671,3 +671,198 @@ h2 {
   letter-spacing: 0.08em;
   pointer-events: none;
 }
+
+.build-btn {
+  right: 78px;
+  min-width: 56px;
+  font-size: 15px;
+  border-color: var(--violet);
+  color: var(--violet);
+}
+
+.build-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(3, 5, 12, 0.82);
+  pointer-events: auto;
+}
+
+.build-card {
+  width: min(460px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.build-card h2 {
+  margin: 0;
+  color: var(--violet);
+  font-size: 20px;
+}
+
+.build-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.build-summary div {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.build-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.build-weapons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.build-weapon {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.build-weapon-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.build-weapon-head span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.build-weapon p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.build-general,
+.build-parts-list {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.build-general p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.build-parts-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.build-part {
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.result-report {
+  width: min(460px, 100%);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px auto 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.result-report h3 {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 16px;
+}
+
+.report-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.report-meta div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.report-meta span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.report-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.report-track {
+  margin-top: 3px;
+  height: 8px;
+  border-radius: 6px;
+  background: rgba(140, 180, 255, 0.12);
+  overflow: hidden;
+}
+
+.report-track i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+}
+
+.report-weak {
+  margin: 0;
+  font-size: 13px;
+  color: var(--amber);
+}
+
+.report-cards {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.report-cards p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}

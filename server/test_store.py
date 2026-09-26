@@ -278,6 +278,28 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(summary["weaponBranches"], {"gun": {"volley": 1}})
         self.assertNotIn("Sharon", json.dumps(summary, ensure_ascii=False))
 
+    def test_run_events_summary_averages_damage_shares(self):
+        one = self.store.register("Ada", "secret-pass")["token"]
+        two = self.store.register("Bo", "secret-pass")["token"]
+        self.store.record_run_start(one, {"runId": "d1", "level": 1})
+        self.store.record_run_end(
+            one,
+            {"runId": "d1", "outcome": "died", "level": 1, "wave": 3, "duration": 60, "kills": 10,
+             "damage": {"gun": 0.6, "laser": 0.4}},
+        )
+        self.store.record_run_start(two, {"runId": "d2", "level": 1})
+        self.store.record_run_end(
+            two,
+            {"runId": "d2", "outcome": "died", "level": 1, "wave": 3, "duration": 60, "kills": 10,
+             "damage": {"gun": 0.8, "laser": 0.2}},
+        )
+        summary = self.store.stats_summary("all")
+        self.assertEqual(summary["damageRuns"], 2)
+        self.assertAlmostEqual(summary["avgDamage"]["gun"], 0.7, places=3)
+        self.assertAlmostEqual(summary["avgDamage"]["laser"], 0.3, places=3)
+        keys = list(summary["avgDamage"].keys())
+        self.assertEqual(keys[0], "gun")
+
 
 class HandlerTests(unittest.TestCase):
     def test_register_then_me(self):

@@ -20,6 +20,28 @@ export const WEAPON_INFO = {
   drone: { name: "Дрон", color: "#f472b6" },
 };
 
+export const RESONANCE_INFO = { name: "Резонанс", color: "#e9d5ff" };
+
+export function weaponLabel(tag) {
+  if (tag === "resonance") return RESONANCE_INFO.name;
+  return WEAPON_INFO[tag]?.name || tag;
+}
+
+export function weaponColor(tag) {
+  if (tag === "resonance") return RESONANCE_INFO.color;
+  return WEAPON_INFO[tag]?.color || "#8ea2c6";
+}
+
+export function damageShares(dmgByWeapon) {
+  const total = Object.values(dmgByWeapon || {}).reduce((sum, n) => sum + (n > 0 ? n : 0), 0);
+  const shares = {};
+  if (total <= 0) return shares;
+  for (const [tag, amount] of Object.entries(dmgByWeapon)) {
+    if (amount > 0) shares[tag] = amount / total;
+  }
+  return shares;
+}
+
 export const META_UPGRADES = [
   { key: "atk", title: "Мощность ядра", desc: "+12% урона пулемёта навсегда" },
   { key: "hp", title: "Обшивка", desc: "+40 HP ядра навсегда" },
