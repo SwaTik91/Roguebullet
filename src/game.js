@@ -1319,7 +1319,7 @@ export class Game {
     if (kind === "endless") {
       const wave = levelOrWave;
       if (!wave || wave % 5 !== 0) return null;
-      return { runId: r.runId, kind: "endless", level: r.level, wave };
+      return { runId: r.runId, kind: "endless", level: ((r.chapterNum || 1) - 1) * LEVELS + r.level, wave };
     }
     return null;
   }
@@ -1371,7 +1371,8 @@ export class Game {
     r.endlessWaves = (r.endlessWaves || 0) + 1;
     let partLine = null;
     if (r.endlessWaves % 5 === 0) partLine = await this.requestEndlessPartRoll(r.endlessWaves);
-    await this.ui.onEndlessWave?.(r.level, r.wave, partLine);
+    const absLevel = ((r.chapterNum || 1) - 1) * LEVELS + r.level;
+    await this.ui.onEndlessWave?.(absLevel, r.wave, partLine);
   }
 
   showLevelClear() {

@@ -79,6 +79,16 @@ test("advancing to a new level resets the in-run build, endless keeps it", () =>
   assert.equal(er.crit.mul, 6, "endless keeps crit multiplier");
 });
 
+test("endless claims use the absolute level so chapters do not collide", async () => {
+  const { game } = createBattle({ profile: {}, level: 6, runId: "r" });
+  const r = game.run;
+  assert.equal(r.chapterNum, 2);
+  assert.equal(r.level, 1);
+  r.endlessWaves = 4;
+  await game.endlessWaveCleared();
+  assert.equal(game.ui.endless.level, 6);
+});
+
 test("deeper chapters scale enemy hp up", () => {
   const early = enemyForWave(1, 1, 1, () => 0.99);
   const deep = enemyForWave(1, 4, 1, () => 0.99);
