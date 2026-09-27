@@ -102,7 +102,9 @@ const ui = {
     setHubChrome(false);
     $("hud").classList.add("hidden");
     $("screen-level-clear").classList.remove("hidden");
-    $("clear-title").textContent = `УРОВЕНЬ ${info.level} ПРОЙДЕН`;
+    const chapter = info.chapter || 1;
+    const chapterPrefix = chapter > 1 ? `ГЛАВА ${chapter} · ` : "";
+    $("clear-title").textContent = `${chapterPrefix}УРОВЕНЬ ${info.level} ПРОЙДЕН`;
     $("clear-coins").textContent = `+${info.coins}`;
     $("clear-crystals").textContent = info.crystals ? `+${info.crystals}` : "0";
     $("clear-note").textContent = info.crystals
@@ -111,6 +113,8 @@ const ui = {
     $("clear-part").textContent = "";
     $("clear-part").classList.add("hidden");
     $("btn-next-level").classList.toggle("hidden", !info.canNext);
+    $("btn-next-chapter").classList.toggle("hidden", !info.chapterDone);
+    $("btn-next-chapter").textContent = `ГЛАВА ${chapter + 1}`;
   },
   setLevelClearPart(line) {
     const el = $("clear-part");
@@ -146,7 +150,8 @@ const ui = {
     $("screen-result").classList.remove("hidden");
     $("result-title").textContent = win ? "ГЛАВА УДЕРЖАНА" : "ЯДРО ПАЛО";
     renderReport(run);
-    $("result-wave").textContent = String(run.level);
+    const chapter = run.chapterNum || 1;
+    $("result-wave").textContent = chapter > 1 ? `Гл.${chapter} · ${run.level}` : String(run.level);
     const kills = run.kills && typeof run.kills === "object"
       ? Object.values(run.kills).reduce((sum, n) => sum + Number(n || 0), 0)
       : run.kills;
@@ -533,7 +538,7 @@ function renderReport(run) {
     <div class="report-meta">
       <div><span>Убито</span><b>${kills}</b></div>
       <div><span>Время</span><b>${durText}</b></div>
-      <div><span>Уровень</span><b>${run.level}</b></div>
+      <div><span>Уровень</span><b>${(run.chapterNum || 1) > 1 ? `Гл.${run.chapterNum}·${run.level}` : run.level}</b></div>
       <div><span>Волна</span><b>${run.wave}</b></div>
     </div>
     <div class="report-bars">${bars}</div>
@@ -948,6 +953,7 @@ $("btn-build").onclick = () => {
 };
 $("btn-build-resume").onclick = () => closeBuild();
 $("btn-next-level").onclick = () => game.continueLevel();
+$("btn-next-chapter").onclick = () => game.continueLevel();
 $("btn-endless").onclick = () => game.beginEndless();
 $("btn-clear-menu").onclick = () => {
   ui.hideLevelClear();

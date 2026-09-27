@@ -286,6 +286,7 @@ function page() {
     <section id="waves"><h2>Волны</h2>
       <p>Здоровье растёт как ${WAVE_GROWTH.hpPow} в степени волны и ещё ×${WAVE_GROWTH.chapter} за главу. Урон врага +${Math.round(WAVE_GROWTH.dmgPerWave * 100)}% за волну. Босс на каждой ${BOSS_EVERY}-й волне: ${BOSS_BASE.hp} HP до роста. Обычная волна: (${WAVE_COUNT_BASE} + волна × ${WAVE_COUNT_STEP}) × ${WAVE_COUNT_MULT} врагов. Босс один.</p>
       <p>Фазы босса по HP: на 66% и 33% он вспыхивает, получает разовый щит (25% и 30% HP, не регенерирует), ускоряется и призывает прислужников (10, затем 14). В финальной фазе призыв повторяется каждые 4 с.</p>
+      <p>Главы: после третьего уровня можно продолжить в следующую главу. Уровни начинаются заново, но сложность и награды растут — враги масштабируются как за каждый следующий уровень подряд. Забег длится, пока ядро держится.</p>
       <table><thead><tr><th>Форма</th><th>HP</th><th>Скорость</th><th>Урон</th><th>Опыт</th><th>Монеты</th></tr></thead><tbody>${enemyRows}</tbody></table>
       <p>Шанс сменить форму, если волна уже дошла: ${ENEMY_SPAWN.map((row) => `с ${row.minWave}-й ${Math.round(row.chance * 100)}%`).join(", ")}.</p>
       <p>Спецвраги с ${SPECIAL_SPAWN.minWave}-й волны (${Math.round(SPECIAL_SPAWN.chance * 100)}% вместо обычного): <b>${SHAPES.dash.name}</b> — рывок к ядру ×${SPECIAL_ENEMIES.dash.dash.mul}; <b>${SHAPES.heal.name}</b> — лечит соседей на ${SPECIAL_ENEMIES.heal.healAura.hps} в радиусе ${SPECIAL_ENEMIES.heal.healAura.radius}.</p>

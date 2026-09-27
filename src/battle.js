@@ -139,6 +139,7 @@ export function snapshot(session) {
       runId: run.runId,
       wave: run.wave,
       chapter: run.chapter,
+      chapterNum: run.chapterNum || 1,
       level: run.level,
       coins: run.coins,
       won: !!run.won,

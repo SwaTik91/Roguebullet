@@ -181,6 +181,7 @@ export class Game {
       startedLevel: startLevel,
       level: startLevel,
       chapter: startLevel,
+      chapterNum: 1,
       wave: 1,
       kills: { circle: 0, triangle: 0, square: 0, hex: 0, diamond: 0, split: 0, boss: 0 },
       wavesCleared: 0,
@@ -1372,9 +1373,11 @@ export class Game {
     this.audio.win();
     this.ui.showLevelClear({
       level: r.level,
+      chapter: r.chapterNum || 1,
       coins,
       crystals,
       canNext: r.level < LEVELS,
+      chapterDone: r.level >= LEVELS,
     });
     void this.requestLevelPartRoll();
   }
@@ -1390,11 +1393,12 @@ export class Game {
     }
     const r = this.run;
     if (r.level >= LEVELS) {
-      this.end(true);
-      return;
+      r.chapterNum = (r.chapterNum || 1) + 1;
+      r.level = 1;
+    } else {
+      r.level += 1;
     }
-    r.level += 1;
-    r.chapter = r.level;
+    r.chapter = (r.chapterNum - 1) * LEVELS + r.level;
     r.wave = 1;
     r.endless = false;
     r.power = 1;
@@ -1450,15 +1454,19 @@ export class Game {
   }
 
   facts() {
+    const run = this.run;
+    const startedLevel = run.startedLevel || 1;
+    const maxCampaign = Math.max(0, LEVELS - (startedLevel - 1));
+    const chapterOne = (run.chapterNum || 1) === 1;
     return {
-      runId: this.run.runId,
-      startedLevel: this.run.startedLevel || 1,
-      kills: { ...this.run.kills },
-      wavesCleared: Math.min(18, this.run.wavesCleared),
-      levelsCleared: this.run.levelsCleared,
-      endedLevel: this.run.level,
-      endedWave: Math.min(6, this.run.wave),
-      won: !!this.run.won,
+      runId: run.runId,
+      startedLevel,
+      kills: { ...run.kills },
+      wavesCleared: Math.min(18, run.wavesCleared),
+      levelsCleared: chapterOne ? Math.min(run.levelsCleared, maxCampaign) : maxCampaign,
+      endedLevel: chapterOne ? Math.min(LEVELS, Math.max(startedLevel, run.level)) : LEVELS,
+      endedWave: chapterOne ? Math.min(6, run.wave) : 6,
+      won: !!run.won || !chapterOne,
     };
   }
 
@@ -1481,7 +1489,8 @@ export class Game {
     this.run.won = win;
     this.reportRunEnd(reason || (win ? "cleared" : "died"));
     const run = this.run;
-    const progress = (run.level - 1) * 6 + run.wave;
+    const absLevel = ((run.chapterNum || 1) - 1) * LEVELS + run.level;
+    const progress = (absLevel - 1) * 6 + run.wave;
     this.meta.bestWave = Math.max(this.meta.bestWave, progress);
     this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, win ? LEVELS : run.level);
     this.recordCollection(run);
