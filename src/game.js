@@ -169,13 +169,72 @@ export class Game {
     this.canvas.addEventListener("touchend", up);
   }
 
-  async startRun(level = 1) {
+  initBuild(run) {
     const profile = this.profile || {};
     const hangar = profile.hangar || { atk: 0, hp: 0, charge: 0 };
-    const startLevel = Math.min(3, Math.max(1, Number(level) || 1));
     const atk = 1 + (hangar.atk || 0) * HANGAR_ATK_STEP;
     const hp = TOWER_BASE_HP + (hangar.hp || 0) * HANGAR_HP_STEP;
     const gear = startingLoadout(profile);
+    run.xp = 0;
+    run.nextXp = 18;
+    run.comboNeed = RESONANCE_NEED;
+    run.comboType = null;
+    run.combo = 0;
+    run.comboFlash = 0;
+    run.bossIntro = 0;
+    run.bossPulse = 0;
+    run.overdrive = {
+      charge: OVERDRIVE.startPerHangar * (hangar.charge || 0),
+      max: OVERDRIVE.max,
+      dur: OVERDRIVE.dur,
+      left: 0,
+      mul: OVERDRIVE.mul,
+      chargeGain: 0,
+    };
+    run.offer = { level: 1, xp: 0, next: gunXpToNext(1) };
+    run.pips = {};
+    run.weapons = gear.weapons;
+    run.wepStats = gear.wepStats;
+    run.offerCount = gear.cards;
+    run.drones = [];
+    run.drone = { ...DRONE_START, level: 1, xp: 0, next: gunXpToNext(1), branch: null };
+    run.orbAngle = 0;
+    run.gun = {
+      angle: -Math.PI / 2,
+      dmg: GUN_START.dmg * atk,
+      rate: GUN_START.rate,
+      pellets: GUN_START.pellets,
+      pierce: GUN_START.pierce,
+      bounces: GUN_START.bounces,
+      life: GUN_START.life,
+      speed: GUN_START.speed,
+      gap: GUN_START.gap,
+      edgeMul: 1,
+      swarm: false,
+      falloff: 0,
+      series: false,
+      every: 0,
+      shot: 0,
+      forceNext: false,
+      level: 1,
+      xp: 0,
+      next: gunXpToNext(1),
+      branch: null,
+      autoTurn: GUN_START.autoTurn,
+      cd: 0,
+    };
+    run.crit = { chance: CRIT_START.chance + (profile.critBonus || 0) / 100, mul: CRIT_START.mul };
+    run.tower = { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 };
+    run.usedCard = false;
+    run.dmgByWeapon = {};
+    run.syn = {};
+    applyBonuses(run, sumBonuses(profile.parts || [], profile.loadout || []));
+    applyHangarTree(run, hangar);
+    this.refreshSynergies();
+  }
+
+  async startRun(level = 1) {
+    const startLevel = Math.min(3, Math.max(1, Number(level) || 1));
     this.run = {
       runId: newId(),
       startedLevel: startLevel,
@@ -187,65 +246,10 @@ export class Game {
       wavesCleared: 0,
       levelsCleared: 0,
       coins: 0,
-      xp: 0,
-      nextXp: 18,
-      comboNeed: RESONANCE_NEED,
-      comboType: null,
-      combo: 0,
-      comboFlash: 0,
-      bossIntro: 0,
-      bossPulse: 0,
-      overdrive: {
-        charge: OVERDRIVE.startPerHangar * (hangar.charge || 0),
-        max: OVERDRIVE.max,
-        dur: OVERDRIVE.dur,
-        left: 0,
-        mul: OVERDRIVE.mul,
-        chargeGain: 0,
-      },
-      offer: { level: 1, xp: 0, next: gunXpToNext(1) },
-      pips: {},
       endless: false,
       power: 1,
       levelCoins: 0,
-      weapons: gear.weapons,
-      wepStats: gear.wepStats,
-      offerCount: gear.cards,
-      drones: [],
-      drone: {
-        ...DRONE_START,
-        level: 1,
-        xp: 0,
-        next: gunXpToNext(1),
-        branch: null,
-      },
-      orbAngle: 0,
-      gun: {
-        angle: -Math.PI / 2,
-        dmg: GUN_START.dmg * atk,
-        rate: GUN_START.rate,
-        pellets: GUN_START.pellets,
-        pierce: GUN_START.pierce,
-        bounces: GUN_START.bounces,
-        life: GUN_START.life,
-        speed: GUN_START.speed,
-        gap: GUN_START.gap,
-        edgeMul: 1,
-        swarm: false,
-        falloff: 0,
-        series: false,
-        every: 0,
-        shot: 0,
-        forceNext: false,
-        level: 1,
-        xp: 0,
-        next: gunXpToNext(1),
-        branch: null,
-        autoTurn: GUN_START.autoTurn,
-        cd: 0,
-      },
-      crit: { chance: CRIT_START.chance + (profile.critBonus || 0) / 100, mul: CRIT_START.mul },
-      tower: { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 },
+      won: false,
       enemies: [],
       bullets: [],
       fx: [],
@@ -254,14 +258,8 @@ export class Game {
       spawnQueue: [],
       spawnTimer: 0,
       wavePause: 1.2,
-      won: false,
-      usedCard: false,
-      dmgByWeapon: {},
-      syn: {},
     };
-    applyBonuses(this.run, sumBonuses(profile.parts || [], profile.loadout || []));
-    applyHangarTree(this.run, hangar);
-    this.refreshSynergies();
+    this.initBuild(this.run);
     this.state = "play";
     this.paused = false;
     this.ui.showPlay();
@@ -1413,7 +1411,7 @@ export class Game {
     r.endless = false;
     r.power = 1;
     r.levelCoins = r.coins;
-    r.tower.hp = r.tower.maxHp;
+    this.initBuild(r);
     r.enemies = [];
     r.bullets = [];
     r.spawnQueue = [];
@@ -1422,6 +1420,7 @@ export class Game {
     this.state = "play";
     this.ui.hideLevelClear();
     this.ui.updateHud(r);
+    this.syncDrones();
     this.queueWave();
   }
 

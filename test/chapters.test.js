@@ -54,6 +54,30 @@ test("chapter-one facts are not inflated for a mid-campaign start", () => {
   assert.equal(f.startedLevel, 2);
 });
 
+test("advancing to a new level resets the in-run build, endless keeps it", () => {
+  const built = createBattle({ profile: {}, level: 1, runId: "r" });
+  const r = built.game.run;
+  const baseDmg = r.gun.dmg;
+  r.gun.dmg = baseDmg * 5;
+  r.gun.level = 9;
+  r.crit.mul = 6;
+  r.weapons.laser = true;
+  built.game.continueLevel();
+  assert.equal(r.gun.dmg, baseDmg, "gun damage resets on new level");
+  assert.equal(r.gun.level, 1, "gun level resets on new level");
+  assert.equal(r.crit.mul, 2, "crit multiplier resets on new level");
+  assert.equal(r.weapons.laser, undefined, "unlocked weapon resets on new level");
+
+  const endlessBuilt = createBattle({ profile: {}, level: 1, runId: "r2" });
+  const er = endlessBuilt.game.run;
+  er.gun.dmg *= 5;
+  const kept = er.gun.dmg;
+  er.crit.mul = 6;
+  endlessBuilt.game.beginEndless();
+  assert.equal(er.gun.dmg, kept, "endless keeps upgraded gun damage");
+  assert.equal(er.crit.mul, 6, "endless keeps crit multiplier");
+});
+
 test("deeper chapters scale enemy hp up", () => {
   const early = enemyForWave(1, 1, 1, () => 0.99);
   const deep = enemyForWave(1, 4, 1, () => 0.99);
