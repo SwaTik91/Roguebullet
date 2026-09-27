@@ -29,6 +29,10 @@ from server.rewards import (
 HANGAR_KEYS = {"atk": "hangar_atk", "hp": "hangar_hp", "charge": "hangar_charge"}
 MOSCOW = ZoneInfo("Europe/Moscow")
 DEFAULT_LOADOUT_JSON = "[null,null,null,null,null,null,null,null]"
+PART_RARITY_ORDER = ["common", "rare", "epic", "legendary"]
+PART_RARITY_STEP = {"common": 1, "rare": 2, "epic": 3, "legendary": 4}
+SALVAGE_CRYSTALS = {"common": 3, "rare": 8, "epic": 18, "legendary": 40}
+UPGRADE_COST = {"common": 12, "rare": 30, "epic": 70}
 ENDLESS_PART_CHANCE = 0.30
 ENDLESS_PART_EVERY = 5
 LEVEL_PART_CHANCE = 0.40
@@ -809,6 +813,77 @@ class Store:
             self.db.rollback()
             raise
         return {"profile": profile}
+
+    def salvage_part(self, token, part_id):
+        part_id = str(part_id or "").strip()
+        if not part_id:
+            raise ValueError("Нет детали")
+        account_id = self._account_row(token)["id"]
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            part = self._part_by_id(account_id, part_id)
+            if part is None:
+                raise ValueError("Нет детали")
+            row = self.db.execute("SELECT loadout_json FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            slots = json.loads(row["loadout_json"] or DEFAULT_LOADOUT_JSON)
+            if part_id in slots:
+                raise ValueError("Деталь надета")
+            refund = SALVAGE_CRYSTALS.get(part["rarity"], 0)
+            self.db.execute(
+                "DELETE FROM account_parts WHERE account_id = ? AND id = ?",
+                (account_id, part_id),
+            )
+            self.db.execute(
+                "UPDATE accounts SET crystals = crystals + ? WHERE id = ?",
+                (refund, account_id),
+            )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"profile": profile, "crystals": refund}
+
+    def upgrade_part(self, token, part_id):
+        part_id = str(part_id or "").strip()
+        if not part_id:
+            raise ValueError("Нет детали")
+        account_id = self._account_row(token)["id"]
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            part = self._part_by_id(account_id, part_id)
+            if part is None:
+                raise ValueError("Нет детали")
+            idx = PART_RARITY_ORDER.index(part["rarity"]) if part["rarity"] in PART_RARITY_ORDER else -1
+            if idx < 0 or idx >= len(PART_RARITY_ORDER) - 1:
+                raise ValueError("Уже максимум")
+            next_rarity = PART_RARITY_ORDER[idx + 1]
+            cost = UPGRADE_COST.get(part["rarity"])
+            if cost is None:
+                raise ValueError("Нельзя улучшить")
+            account = self.db.execute("SELECT crystals FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            if account["crystals"] < cost:
+                raise ValueError("Мало кристаллов")
+            step = PART_RARITY_STEP[next_rarity]
+            affixes = []
+            for affix in part["affixes"]:
+                updated = dict(affix)
+                updated["step"] = step
+                affixes.append(updated)
+            self.db.execute(
+                "UPDATE account_parts SET rarity = ?, affixes_json = ? WHERE account_id = ? AND id = ?",
+                (next_rarity, json.dumps(affixes, ensure_ascii=False), account_id, part_id),
+            )
+            self.db.execute(
+                "UPDATE accounts SET crystals = crystals - ? WHERE id = ?",
+                (cost, account_id),
+            )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"profile": profile, "part": self._part_by_id(account_id, part_id)}
 
     def record_run_start(self, token, body, now=None):
         row = self._account_row(token)

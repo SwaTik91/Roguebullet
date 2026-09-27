@@ -5,6 +5,7 @@ import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { CRYSTAL_SHOP, META_UPGRADES, damageShares, weaponColor, weaponLabel } from "./content.js";
 import { api, newId } from "./api.js";
 import { describeAffix, partFamilyLabel, activeSets } from "./parts.js";
+import { canUpgrade, upgradeCost as partUpgradeCost, salvageValue } from "./salvage.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
 import { activeSynergies } from "./synergy.js";
@@ -556,13 +557,27 @@ function renderParts() {
     return;
   }
   $("parts-list").innerHTML = stash
-    .map(
-      (part) =>
-        `<button type="button" class="upgrade part-row" data-part-id="${part.id}"><div>${partBlock(part)}</div></button>`,
-    )
+    .map((part) => {
+      const up = canUpgrade(part.rarity);
+      const upCost = up ? partUpgradeCost(part.rarity) : null;
+      const upDisabled = !up || (profile?.crystals || 0) < upCost;
+      const upLabel = up ? `Улучшить · ${upCost}◆` : "Максимум";
+      return `<div class="upgrade part-row"><div>${partBlock(part)}</div><div class="part-actions"><button data-equip="${part.id}">Надеть</button><button data-up="${part.id}" ${upDisabled ? "disabled" : ""}>${upLabel}</button><button class="salvage-btn" data-salvage="${part.id}">Разобрать · +${salvageValue(part.rarity)}◆</button></div></div>`;
+    })
     .join("");
-  $("parts-list").querySelectorAll("button[data-part-id]").forEach((btn) => {
-    btn.onclick = () => purchase(() => api.equipPart(btn.dataset.partId), renderParts);
+  $("parts-list").querySelectorAll("button[data-equip]").forEach((btn) => {
+    btn.onclick = () => purchase(() => api.equipPart(btn.dataset.equip), renderParts);
+  });
+  $("parts-list").querySelectorAll("button[data-up]:not([disabled])").forEach((btn) => {
+    btn.onclick = () => purchase(() => api.upgradePart(btn.dataset.up), renderParts);
+  });
+  $("parts-list").querySelectorAll("button[data-salvage]").forEach((btn) => {
+    btn.onclick = () => {
+      const part = byId.get(btn.dataset.salvage);
+      const gain = part ? salvageValue(part.rarity) : 0;
+      if (!confirm(`Разобрать деталь на +${gain}◆? Это навсегда.`)) return;
+      purchase(() => api.salvagePart(btn.dataset.salvage), renderParts);
+    };
   });
 }
 

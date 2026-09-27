@@ -100,6 +100,12 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     unequipPart(slot) {
       return request("/parts/unequip", { method: "POST", body: { slot } });
     },
+    salvagePart(partId) {
+      return request("/parts/salvage", { method: "POST", body: { partId } });
+    },
+    upgradePart(partId) {
+      return request("/parts/upgrade", { method: "POST", body: { partId } });
+    },
     rollPart(body) {
       return request("/parts/roll", { method: "POST", body });
     },

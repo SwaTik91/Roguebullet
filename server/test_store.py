@@ -194,6 +194,74 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.dev_part(token, "mythic", lambda: 0.1, roller=roller)
 
+    def test_salvage_and_upgrade_parts(self):
+        token = self.store.register("Sharon", "secret-pass")["token"]
+
+        def roller(_rng, _owned, rarity):
+            return {
+                "base": "antenna",
+                "baseName": "Антенна",
+                "family": "emp",
+                "rarity": rarity,
+                "affixes": [{"id": "dmg", "name": "урон", "step": 1}],
+            }
+
+        common = self.store.dev_part(token, "common", lambda: 0.1, roller=roller)["part"]
+        crystals_before = self.store.account_for_token(token)["crystals"]
+        salvaged = self.store.salvage_part(token, common["id"])
+        self.assertEqual(salvaged["crystals"], 3)
+        self.assertEqual(salvaged["profile"]["crystals"], crystals_before + 3)
+        self.assertEqual(salvaged["profile"]["parts"], [])
+
+        target = self.store.dev_part(token, "common", lambda: 0.1, roller=roller)["part"]
+        self.store.dev_crystals(token, 100)
+        crystals_now = self.store.account_for_token(token)["crystals"]
+        upgraded = self.store.upgrade_part(token, target["id"])
+        self.assertEqual(upgraded["part"]["rarity"], "rare")
+        self.assertEqual(upgraded["part"]["affixes"][0]["step"], 2)
+        self.assertEqual(upgraded["profile"]["crystals"], crystals_now - 12)
+
+        equipped = self.store.dev_part(token, "epic", lambda: 0.1, roller=roller)["part"]
+        self.store.equip_part(token, equipped["id"])
+        with self.assertRaises(ValueError) as ctx:
+            self.store.salvage_part(token, equipped["id"])
+        self.assertEqual(str(ctx.exception), "Деталь надета")
+
+    def test_upgrade_rejects_legendary_and_poor_accounts(self):
+        token = self.store.register("Sharon", "secret-pass")["token"]
+
+        def roller(_rng, _owned, rarity):
+            return {
+                "base": "antenna",
+                "baseName": "Антенна",
+                "family": "emp",
+                "rarity": rarity,
+                "affixes": [{"id": "dmg", "name": "урон", "step": 1}],
+            }
+
+        legendary = self.store.dev_part(token, "legendary", lambda: 0.1, roller=roller)["part"]
+        self.store.dev_crystals(token, 100)
+        with self.assertRaises(ValueError) as ctx:
+            self.store.upgrade_part(token, legendary["id"])
+        self.assertEqual(str(ctx.exception), "Уже максимум")
+
+        broke = self.store.register("Ada", "secret-pass")["token"]
+
+        def poor_roller(_rng, _owned):
+            return {
+                "id": "ada-part",
+                "base": "antenna",
+                "baseName": "Антенна",
+                "family": "emp",
+                "rarity": "common",
+                "affixes": [{"id": "dmg", "name": "урон", "step": 1}],
+            }
+
+        self.store.roll_part(broke, "run-poor", "level", 1, None, lambda: 0.1, roller=poor_roller)
+        with self.assertRaises(ValueError) as ctx:
+            self.store.upgrade_part(broke, "ada-part")
+        self.assertEqual(str(ctx.exception), "Мало кристаллов")
+
     def test_dev_is_denied_for_non_testers(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         with self.assertRaises(ValueError) as ctx:

@@ -45,6 +45,7 @@ import { laserStep } from "../src/laser.js";
 import { orbStep } from "../src/orb.js";
 import { AFFIXES, BASES, PART_RARITY_CUTS, PART_UNIVERSAL_CHANCE, RARITY_STEP, SET_TIERS, describeAffix, partFamilyLabel, setDesc } from "../src/parts.js";
 import { scatterStep } from "../src/scatter.js";
+import { SALVAGE_CRYSTALS, UPGRADE_COST } from "../src/salvage.js";
 import { SYNERGIES, synergyReqLabels } from "../src/synergy.js";
 import { upgradeCost } from "../src/storage.js";
 
@@ -185,6 +186,9 @@ function partsSection(chance, every) {
     <h3>Сеты</h3>
     <p>Сет включается, когда надето несколько деталей одного семейства. Бонусы сета не ограничены потолками свойств.</p>
     <table><thead><tr><th>Семейство</th><th>Бонусы по числу деталей</th></tr></thead><tbody>${setRows}</tbody></table>
+    <h3>Разбор и улучшение</h3>
+    <p>Ненадетую деталь можно разобрать на кристаллы: обычная +${SALVAGE_CRYSTALS.common}, редкая +${SALVAGE_CRYSTALS.rare}, эпическая +${SALVAGE_CRYSTALS.epic}, легендарная +${SALVAGE_CRYSTALS.legendary}.</p>
+    <p>Улучшение поднимает деталь на редкость выше и усиливает её свойства: обычная → редкая ${UPGRADE_COST.common}◆, редкая → эпическая ${UPGRADE_COST.rare}◆, эпическая → легендарная ${UPGRADE_COST.epic}◆.</p>
   </section>`;
 }
 

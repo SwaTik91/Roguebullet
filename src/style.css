@@ -538,6 +538,27 @@ h2 {
   color: inherit;
 }
 
+.part-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.part-actions button {
+  flex: 1 1 auto;
+  min-width: 96px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.part-actions .salvage-btn {
+  border-color: #7f5539;
+  color: #fbbf24;
+}
+
 .rarity-common {
   color: var(--text);
 }
