@@ -183,7 +183,7 @@ export class Game {
       chapter: startLevel,
       chapterNum: 1,
       wave: 1,
-      kills: { circle: 0, triangle: 0, square: 0, hex: 0, diamond: 0, split: 0, boss: 0 },
+      kills: { circle: 0, triangle: 0, square: 0, hex: 0, diamond: 0, dash: 0, heal: 0, split: 0, boss: 0 },
       wavesCleared: 0,
       levelsCleared: 0,
       coins: 0,

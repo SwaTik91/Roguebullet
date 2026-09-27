@@ -6,6 +6,8 @@ ENEMY_COINS = {
     "square": 3,
     "hex": 3,
     "diamond": 3,
+    "dash": 3,
+    "heal": 4,
     "split": 1,
     "boss": 28,
 }

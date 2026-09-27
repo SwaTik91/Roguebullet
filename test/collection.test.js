@@ -29,3 +29,13 @@ test("recordCollection is additive across runs and de-duplicates", () => {
   assert.deepEqual(game.meta.seen.enemies.filter((t) => t === "circle").length, 1);
   assert.ok(game.meta.seen.enemies.includes("square"));
 });
+
+test("a real dash kill is counted in its own bucket, not split", () => {
+  const { game } = createBattle({ profile: {}, level: 1, runId: "r" });
+  const tw = game.run.tower;
+  const e = { type: "dash", x: tw.x, y: tw.y - 60, r: 14, hp: 10, maxHp: 42, shield: 0, maxShield: 0, dmg: 8, speed: 80, color: "#f97316", xp: 9, coins: 3, dead: false, id: 1 };
+  game.run.enemies = [e];
+  game.damage(e, 999, "#7ee8ff", false, false, "gun");
+  assert.equal(game.run.kills.dash, 1);
+  assert.equal(game.run.kills.split, 0);
+});
