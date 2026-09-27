@@ -45,6 +45,7 @@ import { laserStep } from "../src/laser.js";
 import { orbStep } from "../src/orb.js";
 import { AFFIXES, BASES, PART_RARITY_CUTS, PART_UNIVERSAL_CHANCE, RARITY_STEP, describeAffix, partFamilyLabel } from "../src/parts.js";
 import { scatterStep } from "../src/scatter.js";
+import { SYNERGIES, synergyReqLabels } from "../src/synergy.js";
 import { upgradeCost } from "../src/storage.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -207,6 +208,7 @@ function page() {
     `<a href="#parts">Запчасти</a>`,
     `<a href="#hangar">Ангар и магазин</a>`,
     `<a href="#waves">Волны</a>`,
+    `<a href="#synergies">Синергии</a>`,
     `<a href="#xp">Опыт</a>`,
     `<a href="#drive">Овердрайв</a>`,
   ].join("");
@@ -269,6 +271,12 @@ function page() {
       <p>Спецвраги с ${SPECIAL_SPAWN.minWave}-й волны (${Math.round(SPECIAL_SPAWN.chance * 100)}% вместо обычного): <b>${SHAPES.dash.name}</b> — рывок к ядру ×${SPECIAL_ENEMIES.dash.dash.mul}; <b>${SHAPES.heal.name}</b> — лечит соседей на ${SPECIAL_ENEMIES.heal.healAura.hps} в радиусе ${SPECIAL_ENEMIES.heal.healAura.radius}.</p>
       <p>Элитки с ${ELITE.minWave}-й волны (${Math.round(ELITE.chance * 100)}%): HP ×${ELITE.hpMul}, урон ×${ELITE.dmgMul}, монеты ×${ELITE.coinMul}, опыт ×${ELITE.xpMul}. Модификатор один из: броня (щит 50% HP), стремительность (скорость ×1.6), всплеск (взрыв и осколки при смерти).</p>
       <table><thead><tr><th>Волна</th><th>Врагов</th><th>Форма при нулевом броске</th><th>HP</th><th>Урон</th><th>Волна бесконечного режима</th></tr></thead><tbody>${waveRows.join("")}</tbody></table>
+    </section>
+    <section id="synergies"><h2>Синергии</h2>
+      <p>Синергия включается, когда оба оружия развиты до своей ветки. Эффект работает пассивно весь забег и виден на экране сборки.</p>
+      <table><thead><tr><th>Синергия</th><th>Условия</th><th>Эффект</th></tr></thead><tbody>${SYNERGIES.map(
+        (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(synergyReqLabels(s).join(" + "))}</td><td>${esc(s.desc)}</td></tr>`,
+      ).join("")}</tbody></table>
     </section>
     <section id="xp"><h2>Опыт улучшений</h2>
       <p>${esc(xpNote)} Потолок темпа пулемёта ${GUN_RATE_CAP}. Потолок шанса крита ${Math.round(GUN_CRIT_CAP * 100)}%.</p>

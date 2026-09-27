@@ -7,6 +7,7 @@ import { api, newId } from "./api.js";
 import { describeAffix, partFamilyLabel } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
+import { activeSynergies } from "./synergy.js";
 import { retryPendingClaims, retryPendingPartRolls } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
@@ -456,6 +457,12 @@ function renderBuild() {
     })
     .join("");
   const general = groups["Общая карта"] || [];
+  const syns = activeSynergies(run);
+  $("build-synergies").innerHTML = syns.length
+    ? `<b>Синергии</b>${syns
+        .map((s) => `<div class="build-syn"><b>${s.name}</b><span>${s.desc}</span></div>`)
+        .join("")}`
+    : "";
   const parts = equippedParts();
   const partHtml = parts.length
     ? parts.map((p) => `<span class="build-part rarity-${p.rarity || "common"}">${p.baseName || p.base} · ${partFamilyLabel(p.family)}</span>`).join("")

@@ -5,6 +5,7 @@ import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
 import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
 import { sumBonuses, applyBonuses, partFamilyLabel } from "./parts.js";
+import { synergyFlags } from "./synergy.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const PENDING_PART_ROLL_KEY = "roguebullet-pending-part-roll";
@@ -254,8 +255,10 @@ export class Game {
       won: false,
       usedCard: false,
       dmgByWeapon: {},
+      syn: {},
     };
     applyBonuses(this.run, sumBonuses(profile.parts || [], profile.loadout || []));
+    this.refreshSynergies();
     this.state = "play";
     this.paused = false;
     this.ui.showPlay();
@@ -264,6 +267,7 @@ export class Game {
     this.ui.updateHud(this.run);
     if (this.headless || this.coop) {
       if (this.queuedCard) applyQueuedCard(this.run, this.queuedCard);
+      this.refreshSynergies();
       return;
     }
     this.reportRunStart();
@@ -620,6 +624,11 @@ export class Game {
     this.shake = 8;
   }
 
+  refreshSynergies() {
+    if (!this.run) return;
+    this.run.syn = synergyFlags(this.run);
+  }
+
   applyCard(card) {
     if (this.coop?.live && !this._coopEcho) {
       this.sendCoop({ t: "pick", id: card.id });
@@ -662,6 +671,7 @@ export class Game {
     this.state = "play";
     this.ui.hideCards();
     this.ui.toast(card.title);
+    this.refreshSynergies();
     this.ui.updateHud(this.run);
     this.audio.pickup();
     this.syncDrones();
@@ -944,10 +954,11 @@ export class Game {
     const r = this.run;
     r.orbAngle += o.spin * dt;
     if (o.branch === "ward") {
-      o.guardT = (o.guardT ?? o.guardCd ?? 4) - dt;
+      const cd = (o.guardCd || 4) * (r.syn?.wardRush ? 0.5 : 1);
+      o.guardT = (o.guardT ?? cd) - dt;
       if ((o.guard || 0) < (o.guardMax || 1) && o.guardT <= 0) {
         o.guard = (o.guard || 0) + 1;
-        o.guardT = o.guardCd || 4;
+        o.guardT = cd;
       }
     }
     if (o.lunge) {
@@ -1249,8 +1260,12 @@ export class Game {
   explode(x, y, radius, dmg, tag = "grenade") {
     this.burst(x, y, "#fb7185", 18);
     this.audio.boom();
+    const burn = this.run?.syn?.burnBlast ? dmg * 0.3 : 0;
     for (const e of this.run.enemies) {
-      if (!e.dead && dist(e, { x, y }) < radius) this.damage(e, dmg, "#fb7185", true, false, tag);
+      if (!e.dead && dist(e, { x, y }) < radius) {
+        this.damage(e, dmg, "#fb7185", true, false, tag);
+        if (burn && !e.dead) this.ignite(e, burn, tag);
+      }
     }
   }
 
@@ -1826,7 +1841,9 @@ export class Game {
       for (const e of r.enemies) {
         if (e.dead || b.hit.has(e)) continue;
         if (dist(b, e) < b.r + e.r) {
-          const crit = this.damage(e, b.dmg, b.color, true, !!b.guaranteedCrit, b.tag);
+          let dmg = b.dmg;
+          if (this.run?.syn?.empBurst && b.tag === "gun" && ((e.slow || 0) > 0 || (e.freeze || 0) > 0)) dmg *= 1.4;
+          const crit = this.damage(e, dmg, b.color, true, !!b.guaranteedCrit, b.tag);
           if (crit && b.canChain) r.gun.forceNext = true;
           if (b.knock) {
             const a = angTo(tw, e);
