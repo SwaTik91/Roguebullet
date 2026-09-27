@@ -873,6 +873,20 @@ h2 {
   font-size: 13px;
 }
 
+.build-weapon-dmg {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.build-weapon-dmg b {
+  color: var(--cyan);
+  font-size: 13px;
+}
+
 .build-weapon p {
   margin: 4px 0 0;
   font-size: 13px;

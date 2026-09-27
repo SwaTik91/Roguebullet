@@ -521,12 +521,14 @@ function renderBuild() {
     <div><span>HP ядра</span><b>${hp}/${maxHp}</b></div>
     <div><span>Овердрайв</span><b>${driveHot ? "активен" : `${drivePct}%`}</b></div>`;
   const groups = cardsByWeaponLabel(run);
+  const dmgBy = run.dmgByWeapon || {};
   $("build-weapons").innerHTML = runWeaponEntries(run)
     .map((e) => {
       const label = weaponLabel(e.id);
       const branch = e.branch ? ` · ${BRANCH_LABELS[e.branch] || e.branch}` : "";
       const cards = (groups[label] || []).join(", ");
-      return `<div class="build-weapon"><div class="build-weapon-head"><b style="color:${weaponColor(e.id)}">${label}</b><span>ур. ${e.level}${branch}</span></div>${cards ? `<p>${cards}</p>` : ""}</div>`;
+      const dmg = Math.round(dmgBy[e.id] || 0);
+      return `<div class="build-weapon"><div class="build-weapon-head"><b style="color:${weaponColor(e.id)}">${label}</b><span>ур. ${e.level}${branch}</span></div><div class="build-weapon-dmg"><span>Нанесено урона</span><b>${dmg.toLocaleString("ru-RU")}</b></div>${cards ? `<p>${cards}</p>` : ""}</div>`;
     })
     .join("");
   const general = groups["Общая карта"] || [];

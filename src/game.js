@@ -530,6 +530,12 @@ export class Game {
     return crit;
   }
 
+  contactDamage(e, amt, src, tag) {
+    const c = this.run.crit;
+    const mul = c ? 1 + (c.chance || 0) * ((c.mul || 2) - 1) : 1;
+    return this.damage(e, amt * mul, src, false, false, tag);
+  }
+
   floatDamage(x, y, amount, crit) {
     if (this.meta.showDamage === false) return;
     const n = Math.max(1, Math.round(amount));
@@ -993,7 +999,7 @@ export class Game {
         y = fly.y;
         if (o.through && !fly.back) {
           for (const e of r.enemies) {
-            if (!e.dead && dist(e, fly) < e.r + 14) this.damage(e, o.dmg * dt * 10, "#34d399", false, false, "orb");
+            if (!e.dead && dist(e, fly) < e.r + 14) this.contactDamage(e, o.dmg * dt * 10, "#34d399", "orb");
           }
         }
         if (!fly.hit && dist(fly, { x: fly.tx, y: fly.ty }) < 18) {
@@ -1018,7 +1024,7 @@ export class Game {
           fly.y = fly.anchor.y;
           x = fly.x;
           y = fly.y;
-          this.damage(fly.anchor, o.dmg * dt * 8, "#34d399", false, false, "orb");
+          this.contactDamage(fly.anchor, o.dmg * dt * 8, "#34d399", "orb");
         } else if (fly.anchor) fly.back = true;
         if (fly.back && dist(fly, home) < 16) fly.done = true;
       }
@@ -1029,7 +1035,7 @@ export class Game {
         const touch = dist(e, { x, y }) < e.r + reach;
         const onRing = o.saw && Math.abs(dist(e, tw) - o.radius) < 16 + e.r;
         if (touch || onRing) {
-          this.damage(e, o.dmg * dt * (o.saw && onRing ? 6 : 8), "#34d399", false, false, "orb");
+          this.contactDamage(e, o.dmg * dt * (o.saw && onRing ? 6 : 8), "#34d399", "orb");
           if (o.bleed) this.ignite(e, o.dmg * 4, "orb");
           if (o.knock && o.branch === "ward") {
             const a = angTo(tw, e);
@@ -1050,7 +1056,7 @@ export class Game {
       if (o.inner) {
         const inner = { x: tw.x + (home.x - tw.x) * 0.45, y: tw.y + (home.y - tw.y) * 0.45 };
         for (const e of r.enemies) {
-          if (!e.dead && dist(e, inner) < e.r + reach) this.damage(e, o.dmg * dt * 8, "#34d399", false, false, "orb");
+          if (!e.dead && dist(e, inner) < e.r + reach) this.contactDamage(e, o.dmg * dt * 8, "#34d399", "orb");
         }
       }
     }
@@ -1626,7 +1632,7 @@ export class Game {
       beam.tick = 0.2;
       for (const e of r.enemies) {
         if (e.dead) continue;
-        if (pointLine(e.x, e.y, beam.x1, beam.y1, beam.x2, beam.y2) < beam.w + e.r) this.damage(e, beam.dps * 0.2, "#60a5fa", false, false, beam.tag || "laser");
+        if (pointLine(e.x, e.y, beam.x1, beam.y1, beam.x2, beam.y2) < beam.w + e.r) this.contactDamage(e, beam.dps * 0.2, "#60a5fa", beam.tag || "laser");
       }
     }
     r.beams = r.beams.filter((beam) => beam.life > 0);

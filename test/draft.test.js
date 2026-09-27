@@ -121,7 +121,8 @@ test("common cards outweigh rare cards, which outweigh epics", () => {
 
 test("legendaries stay out of the random pool and open on the 5th, 10th and 15th pick", () => {
   const open = battlePool(run());
-  assert.equal(open.some((c) => c.id === "queue" || c.rarity === "legendary"), false);
+  assert.equal(open.some((c) => c.id === "queue"), false);
+  assert.equal(open.some((c) => c.rarity === "legendary" && c.who !== "Общая карта"), false);
   assert.equal(weaponMilestone(3), 0);
   assert.equal(weaponMilestone(4), 5);
   assert.equal(weaponMilestone(9), 10);

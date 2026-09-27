@@ -13,6 +13,10 @@ function card(id, title, desc, rarity, apply) {
   return { id, title, desc, rarity, apply };
 }
 
+function critMul(r, amount) {
+  r.crit.mul = Math.min(8, (r.crit.mul || 2) + amount);
+}
+
 const GENERAL = [
   card("gen-plates", "Пластины", "Ядро +80 HP и лёгкий реген", "common", (r) => {
     r.tower.maxHp += 80;
@@ -20,6 +24,8 @@ const GENERAL = [
     r.tower.regen += 1.2;
   }),
   card("gen-crit", "Крит", "Шанс крита +6%", "common", (r) => addCrit(r, 0.06)),
+  card("gen-cdmg1", "Заточка бойка", "Урон крита +25%", "common", (r) => critMul(r, 0.25)),
+  card("gen-cdmg2", "Калёный удар", "Урон крита +30%", "common", (r) => critMul(r, 0.3)),
   card("gen-regen", "Регенерация", "Регенерация ядра +2", "common", (r) => {
     r.tower.regen += 2;
   }),
@@ -30,6 +36,8 @@ const GENERAL = [
     r.tower.maxHp += 140;
   }),
   card("gen-sharp", "Острота", "Шанс крита +10%", "rare", (r) => addCrit(r, 0.1)),
+  card("gen-cdmg3", "Пробойник", "Урон крита +40%", "rare", (r) => critMul(r, 0.4)),
+  card("gen-cdmg4", "Кумулятив", "Урон крита +50%", "rare", (r) => critMul(r, 0.5)),
   card("gen-reson", "Резонатор", "Резонанс форм требует на 2 убийства меньше", "rare", (r) => {
     r.comboNeed = Math.max(3, r.comboNeed - 2);
   }),
@@ -37,10 +45,14 @@ const GENERAL = [
     r.tower.maxHp += 220;
   }),
   card("gen-critc", "Контур крита", "Шанс крита +15%", "epic", (r) => addCrit(r, 0.15)),
+  card("gen-cdmg5", "Разрушитель", "Урон крита +70%", "epic", (r) => critMul(r, 0.7)),
+  card("gen-cdmg6", "Аннигилятор", "Урон крита +80%", "epic", (r) => critMul(r, 0.8)),
   card("gen-over", "Перегруз", "Овердрайв длится дольше и сильнее", "epic", (r) => {
     r.overdrive.dur += 1.4;
     r.overdrive.mul += 0.35;
   }),
+  card("gen-cdmg7", "Смертельный приговор", "Урон крита +100%", "legendary", (r) => critMul(r, 1.0)),
+  card("gen-cdmg8", "Абсолют", "Урон крита +125%", "legendary", (r) => critMul(r, 1.25)),
 ];
 
 const UNLOCKS = [
