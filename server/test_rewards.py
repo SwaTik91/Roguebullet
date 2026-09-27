@@ -12,6 +12,9 @@ from server.rewards import (
     validate_endless,
     ready_achievements,
     roll_chest,
+    season_days_left,
+    season_for_date,
+    season_label,
     xp_reward,
 )
 
@@ -74,9 +77,35 @@ class MetaTests(unittest.TestCase):
         self.assertEqual(by_id["level"]["done"], False)
 
     def test_ready_achievements_skip_claimed(self):
-        stats = {"kills": 100, "cleared_levels": {1}, "hangar_buys": 1, "chests": 0}
+        stats = {"kills": 100, "cleared_levels": {1}, "hangar_buys": 1, "chests": 0, "best_endless": 0}
         ready = ready_achievements(stats, {"first_blood"})
         self.assertEqual(ready, ["first_boss", "kills_100", "hangar"])
+
+    def test_extended_dailies_track_kills_and_horde(self):
+        tasks = daily_tasks(150, True, True, set(), endless_wave=8)
+        by_id = {task["id"]: task for task in tasks}
+        self.assertTrue(by_id["kills150"]["done"])
+        self.assertTrue(by_id["endless8"]["done"])
+        self.assertTrue(by_id["level"]["done"])
+        low = {task["id"]: task for task in daily_tasks(149, False, False, set(), endless_wave=7)}
+        self.assertFalse(low["kills150"]["done"])
+        self.assertFalse(low["endless8"]["done"])
+
+    def test_extended_achievements_reward_horde_and_grind(self):
+        stats = {"kills": 2000, "cleared_levels": {1, 3}, "hangar_buys": 10, "chests": 10, "best_endless": 25}
+        ready = ready_achievements(stats, set())
+        for wanted in ("kills_2000", "hangar_10", "chest_10", "endless_10", "endless_25"):
+            self.assertIn(wanted, ready)
+        self.assertEqual(achievement_crystals("endless_25"), 20)
+
+    def test_seasons_are_monthly_with_days_left(self):
+        import datetime
+
+        june = datetime.date(2026, 6, 15)
+        july = datetime.date(2026, 7, 1)
+        self.assertEqual(season_for_date(july) - season_for_date(june), 1)
+        self.assertEqual(season_label(season_for_date(datetime.date(2026, 9, 5))), "2026-09")
+        self.assertEqual(season_days_left(datetime.date(2026, 9, 28)), 3)
 
     def test_achievement_amounts(self):
         self.assertEqual(achievement_crystals("three_levels"), 20)

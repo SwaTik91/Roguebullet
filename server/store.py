@@ -22,8 +22,12 @@ from server.rewards import (
     hangar_price,
     hangar_node_price,
     HANGAR_TREE,
+    LEADERBOARD_SIZE,
     ready_achievements,
     roll_chest,
+    season_days_left,
+    season_for_date,
+    season_label,
     xp_reward,
     ENEMY_COINS,
 )
@@ -56,6 +60,14 @@ def moscow_day(now):
     return now.astimezone(MOSCOW).date().isoformat()
 
 
+def moscow_date(now):
+    if isinstance(now, str):
+        now = datetime.fromisoformat(now)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    return now.astimezone(MOSCOW).date()
+
+
 class Store:
     def __init__(self, path):
         parent = os.path.dirname(path)
@@ -86,7 +98,8 @@ class Store:
                 chests_opened INTEGER NOT NULL DEFAULT 0,
                 kills_total INTEGER NOT NULL DEFAULT 0,
                 loadout_json TEXT NOT NULL DEFAULT '[null,null,null,null,null,null,null,null]',
-                parts_dry INTEGER NOT NULL DEFAULT 0
+                parts_dry INTEGER NOT NULL DEFAULT 0,
+                best_endless INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS sessions (
                 token_hash TEXT PRIMARY KEY,
@@ -116,6 +129,7 @@ class Store:
                 kills INTEGER NOT NULL DEFAULT 0,
                 wave3 INTEGER NOT NULL DEFAULT 0,
                 level_clear INTEGER NOT NULL DEFAULT 0,
+                endless_wave INTEGER NOT NULL DEFAULT 0,
                 claimed_json TEXT NOT NULL DEFAULT '[]',
                 PRIMARY KEY (account_id, day)
             );
@@ -147,6 +161,13 @@ class Store:
                 level INTEGER NOT NULL,
                 wave INTEGER NOT NULL,
                 PRIMARY KEY (account_id, level, wave)
+            );
+            CREATE TABLE IF NOT EXISTS endless_leaderboard (
+                account_id INTEGER NOT NULL,
+                season INTEGER NOT NULL,
+                best_wave INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (account_id, season)
             );
             CREATE TABLE IF NOT EXISTS reroll_counts (
                 account_id INTEGER NOT NULL,
@@ -208,6 +229,8 @@ class Store:
         self._ensure_column("accounts", "loadout_json", f"TEXT NOT NULL DEFAULT '{DEFAULT_LOADOUT_JSON}'")
         self._ensure_column("accounts", "parts_dry", "INTEGER NOT NULL DEFAULT 0")
         self._ensure_column("accounts", "is_guest", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column("accounts", "best_endless", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column("daily", "endless_wave", "INTEGER NOT NULL DEFAULT 0")
         self._ensure_column("run_events", "damage_json", "TEXT")
         self.db.commit()
 
@@ -386,9 +409,12 @@ class Store:
             raise
         return json.loads(encoded)
 
-    def claim_endless(self, token, level, wave):
+    def claim_endless(self, token, level, wave, now=None):
         account_id = self._account_row(token)["id"]
         payout = endless_crystals(level, wave)
+        if now is None:
+            now = datetime.now(timezone.utc)
+        season = season_for_date(moscow_date(now))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             existing = self.db.execute(
@@ -405,12 +431,81 @@ class Store:
                     "UPDATE accounts SET crystals = crystals + ? WHERE id = ?",
                     (granted, account_id),
                 )
+            self._record_endless_progress(account_id, wave, season, now)
             profile = self._profile(account_id)
             self.db.commit()
         except Exception:
             self.db.rollback()
             raise
         return {"granted": granted, "crystals": profile["crystals"], "profile": profile}
+
+    def _record_endless_progress(self, account_id, wave, season, now):
+        wave = int(wave)
+        if isinstance(now, str):
+            now = datetime.fromisoformat(now)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        self.db.execute(
+            "UPDATE accounts SET best_endless = MAX(best_endless, ?) WHERE id = ?",
+            (wave, account_id),
+        )
+        day = moscow_day(now)
+        self.db.execute(
+            "INSERT OR IGNORE INTO daily (account_id, day) VALUES (?, ?)",
+            (account_id, day),
+        )
+        self.db.execute(
+            "UPDATE daily SET endless_wave = MAX(endless_wave, ?) WHERE account_id = ? AND day = ?",
+            (wave, account_id, day),
+        )
+        self.db.execute(
+            """
+            INSERT INTO endless_leaderboard (account_id, season, best_wave, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(account_id, season) DO UPDATE SET
+                best_wave = MAX(best_wave, excluded.best_wave),
+                updated_at = CASE
+                    WHEN excluded.best_wave > endless_leaderboard.best_wave THEN excluded.updated_at
+                    ELSE endless_leaderboard.updated_at
+                END
+            """,
+            (account_id, season, wave, now.isoformat()),
+        )
+
+    def leaderboard(self, token, now=None):
+        account_id = self._account_row(token)["id"]
+        if now is None:
+            now = datetime.now(timezone.utc)
+        d = moscow_date(now)
+        season = season_for_date(d)
+        rows = self.db.execute(
+            """
+            SELECT a.name AS name, l.best_wave AS best_wave, l.updated_at AS updated_at, l.account_id AS account_id
+            FROM endless_leaderboard l
+            JOIN accounts a ON a.id = l.account_id
+            WHERE l.season = ? AND l.best_wave > 0
+            ORDER BY l.best_wave DESC, l.updated_at ASC
+            """,
+            (season,),
+        ).fetchall()
+        top = [
+            {"rank": index + 1, "name": row["name"], "wave": int(row["best_wave"])}
+            for index, row in enumerate(rows[:LEADERBOARD_SIZE])
+        ]
+        me = None
+        for index, row in enumerate(rows):
+            if row["account_id"] == account_id:
+                me = {"rank": index + 1, "wave": int(row["best_wave"])}
+                break
+        return {
+            "season": {
+                "id": season,
+                "label": season_label(season),
+                "daysLeft": season_days_left(d),
+            },
+            "top": top,
+            "me": me,
+        }
 
     def buy_reroll(self, token, run_id, offer_level):
         run_id = str(run_id or "").strip()
@@ -644,7 +739,13 @@ class Store:
                 (account_id, day),
             )
             daily = self._daily_state(account_id, day)
-            tasks = daily_tasks(daily["kills"], daily["wave3"], daily["level_clear"], json.loads(daily["claimed_json"]))
+            tasks = daily_tasks(
+                daily["kills"],
+                daily["wave3"],
+                daily["level_clear"],
+                json.loads(daily["claimed_json"]),
+                daily["endless_wave"],
+            )
             task = next((item for item in tasks if item["id"] == task_id), None)
             if task is None or not task["done"] or task["claimed"]:
                 raise ValueError("Задание ещё нельзя забрать")
@@ -1188,6 +1289,7 @@ class Store:
                 daily["wave3"],
                 daily["level_clear"],
                 json.loads(daily["claimed_json"]),
+                daily["endless_wave"],
             ),
             "parts": self._parts_list(account_id),
             "loadout": json.loads(row["loadout_json"] or DEFAULT_LOADOUT_JSON),
@@ -1311,6 +1413,7 @@ class Store:
             "cleared_levels": cleared,
             "hangar_buys": row["hangar_buys"],
             "chests": row["chests_opened"],
+            "best_endless": row["best_endless"],
         }
 
     def _daily_state(self, account_id, day):
@@ -1320,7 +1423,7 @@ class Store:
         ).fetchone()
         if row:
             return row
-        return {"kills": 0, "wave3": 0, "level_clear": 0, "claimed_json": "[]"}
+        return {"kills": 0, "wave3": 0, "level_clear": 0, "endless_wave": 0, "claimed_json": "[]"}
 
     def _add_daily(self, account_id, now, kill_count, waves_cleared, levels_cleared):
         day = moscow_day(now)

@@ -904,6 +904,47 @@ h2 {
   opacity: 0.6;
 }
 
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.lb-row.mine {
+  border-color: var(--accent, #6cf);
+  background: rgba(108, 204, 255, 0.12);
+}
+
+.lb-row.lb-sep {
+  margin-top: 6px;
+}
+
+.lb-rank {
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+}
+
+.lb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-wave {
+  font-weight: 700;
+}
+
 .result-report {
   width: min(460px, 100%);
   text-align: left;

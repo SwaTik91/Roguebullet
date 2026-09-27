@@ -71,7 +71,9 @@ def first_clear_crystals(already, levels_cleared, started_level=1):
 DAILY = (
     ("wave3", 2),
     ("kills40", 2),
+    ("kills150", 3),
     ("level", 4),
+    ("endless8", 4),
 )
 ACHIEVEMENT_CRYSTALS = {
     "first_blood": 2,
@@ -79,24 +81,37 @@ ACHIEVEMENT_CRYSTALS = {
     "three_levels": 20,
     "kills_100": 5,
     "kills_500": 10,
+    "kills_2000": 25,
     "hangar": 3,
+    "hangar_10": 12,
     "chest": 3,
+    "chest_10": 12,
+    "endless_10": 8,
+    "endless_25": 20,
 }
 WEAPONS = ("laser", "scatter", "grenade", "emp", "orb", "drone")
 COMMON_CARDS = ("Калибр", "Темп", "Сервопривод", "Пластины")
 CRIT_CAP = 10
 
 
-def daily_tasks(kills_today, cleared_wave3, cleared_level, claimed):
-    done = {"wave3": bool(cleared_wave3), "kills40": int(kills_today) >= 40, "level": bool(cleared_level)}
+def daily_tasks(kills_today, cleared_wave3, cleared_level, claimed, endless_wave=0):
+    claimed_set = set(claimed)
+    done = {
+        "wave3": bool(cleared_wave3),
+        "kills40": int(kills_today) >= 40,
+        "kills150": int(kills_today) >= 150,
+        "level": bool(cleared_level),
+        "endless8": int(endless_wave) >= 8,
+    }
     return [
-        {"id": task_id, "crystals": crystals, "done": done[task_id], "claimed": task_id in set(claimed)}
+        {"id": task_id, "crystals": crystals, "done": done[task_id], "claimed": task_id in claimed_set}
         for task_id, crystals in DAILY
     ]
 
 
 def ready_achievements(stats, claimed):
     cleared = set(stats["cleared_levels"])
+    best_endless = int(stats.get("best_endless", 0))
     ready = []
     if stats["kills"] >= 1:
         ready.append("first_blood")
@@ -108,10 +123,20 @@ def ready_achievements(stats, claimed):
         ready.append("kills_100")
     if stats["kills"] >= 500:
         ready.append("kills_500")
+    if stats["kills"] >= 2000:
+        ready.append("kills_2000")
     if stats["hangar_buys"] >= 1:
         ready.append("hangar")
+    if stats["hangar_buys"] >= 10:
+        ready.append("hangar_10")
     if stats["chests"] >= 1:
         ready.append("chest")
+    if stats["chests"] >= 10:
+        ready.append("chest_10")
+    if best_endless >= 10:
+        ready.append("endless_10")
+    if best_endless >= 25:
+        ready.append("endless_25")
     owned = set(claimed)
     return [item for item in ready if item not in owned]
 
@@ -150,6 +175,25 @@ def reroll_price(used):
 def endless_crystals(level, wave):
     validate_endless(level, wave)
     return 5
+
+
+LEADERBOARD_SIZE = 20
+
+
+def season_for_date(d):
+    return d.year * 12 + (d.month - 1)
+
+
+def season_label(season):
+    year, month = divmod(int(season), 12)
+    return f"{year}-{month + 1:02d}"
+
+
+def season_days_left(d):
+    import calendar
+
+    last_day = calendar.monthrange(d.year, d.month)[1]
+    return last_day - d.day + 1
 
 
 def hangar_price(owned_level):

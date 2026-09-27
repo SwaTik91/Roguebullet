@@ -215,7 +215,9 @@ const SHOP_WEAPONS = ["laser", "scatter", "grenade", "emp", "orb", "drone"];
 const DAILY_TITLES = {
   wave3: "Пройти 3-ю волну",
   kills40: "Убить 40 врагов",
+  kills150: "Убить 150 врагов",
   level: "Пройти 1 уровень",
+  endless8: "Дойти до 8-й волны орды",
 };
 const ACHIEVEMENT_TITLES = {
   first_blood: "Первая кровь",
@@ -223,8 +225,13 @@ const ACHIEVEMENT_TITLES = {
   three_levels: "Три уровня",
   kills_100: "Сотня",
   kills_500: "Полтысячи",
+  kills_2000: "Две тысячи",
   hangar: "Ангар",
+  hangar_10: "Инженер",
   chest: "Сундук",
+  chest_10: "Кладоискатель",
+  endless_10: "Орда: 10 волн",
+  endless_25: "Орда: 25 волн",
 };
 const PART_RARITY_LABELS = {
   legendary: "ЛЕГЕНДАРКА",
@@ -362,6 +369,45 @@ function maybePromptSave() {
 function renderTasks() {
   renderDailies();
   renderAchievements();
+  renderLeaderboard();
+}
+
+async function renderLeaderboard() {
+  const list = $("leaderboard-list");
+  const seasonLine = $("season-line");
+  if (!list) return;
+  list.innerHTML = `<div class="sub">Загрузка…</div>`;
+  try {
+    const data = await api.leaderboard();
+    const season = data.season || {};
+    seasonLine.textContent = `Сезон ${season.label || "?"} · осталось дней: ${season.daysLeft ?? "?"}`;
+    const top = data.top || [];
+    const me = data.me;
+    const onBoard = me && top.some((row) => row.rank === me.rank);
+    let html = top
+      .map((row) => {
+        const mine = me && row.rank === me.rank ? " mine" : "";
+        return `<div class="lb-row${mine}"><span class="lb-rank">${row.rank}</span><span class="lb-name">${escapeHtml(row.name)}</span><span class="lb-wave">${row.wave}</span></div>`;
+      })
+      .join("");
+    if (me && !onBoard) {
+      html += `<div class="lb-row mine lb-sep"><span class="lb-rank">${me.rank}</span><span class="lb-name">Ты</span><span class="lb-wave">${me.wave}</span></div>`;
+    }
+    if (!html) html = `<div class="sub">Пока никто не дошёл до орды. Будь первым!</div>`;
+    list.innerHTML = html;
+  } catch {
+    list.innerHTML = `<div class="sub">Таблица недоступна без связи.</div>`;
+  }
+}
+
+function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[ch]));
 }
 
 async function purchase(action, rerender) {

@@ -91,6 +91,9 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
     claimEndless(level, wave) {
       return request("/endless", { method: "POST", body: { level, wave } });
     },
+    leaderboard() {
+      return request("/leaderboard", { method: "GET" });
+    },
     buyReroll(runId, offerLevel) {
       return request("/reroll", { method: "POST", body: { runId, offerLevel } });
     },

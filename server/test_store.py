@@ -61,6 +61,33 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.claim_endless(token, 0, 1)
 
+    def test_endless_progress_feeds_daily_leaderboard_and_achievements(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        other = self.store.register("Bo", "secret-pass")["token"]
+        now = "2026-09-23T12:00:00+03:00"
+        self.store.claim_endless(token, 1, 10, now)
+        self.store.claim_endless(other, 1, 25, now)
+        profile = self.store.account_for_token(token)
+        account_id = self.store._account_row(token)["id"]
+        daily = self.store._daily_state(account_id, "2026-09-23")
+        self.assertEqual(daily["endless_wave"], 10)
+        achievements = {item["id"]: item for item in profile["achievements"]}
+        self.assertTrue(achievements["endless_10"]["ready"])
+        self.assertFalse(achievements["endless_25"]["ready"])
+        board = self.store.leaderboard(token, now)
+        self.assertEqual(board["season"]["label"], "2026-09")
+        self.assertEqual([row["name"] for row in board["top"]], ["Bo", "Ada"])
+        self.assertEqual(board["top"][0]["wave"], 25)
+        self.assertEqual(board["me"], {"rank": 2, "wave": 10})
+
+    def test_leaderboard_resets_between_seasons(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        self.store.claim_endless(token, 1, 12, "2026-09-10T12:00:00+03:00")
+        october = self.store.leaderboard(token, "2026-10-02T12:00:00+03:00")
+        self.assertEqual(october["season"]["label"], "2026-10")
+        self.assertEqual(october["top"], [])
+        self.assertIsNone(october["me"])
+
     def test_reroll_charges_the_ladder_once_per_offer(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         self.store.db.execute("UPDATE accounts SET coins = 1000, crystals = 1")

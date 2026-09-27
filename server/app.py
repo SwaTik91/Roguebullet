@@ -72,7 +72,11 @@ def make_handler(store, battles=None):
                 return
             if method == "POST" and path == "/endless":
                 body = self._body()
-                self._send_json(200, store.claim_endless(self._token(), body.get("level"), body.get("wave")))
+                now = datetime.now(timezone.utc)
+                self._send_json(200, store.claim_endless(self._token(), body.get("level"), body.get("wave"), now))
+                return
+            if method == "GET" and path == "/leaderboard":
+                self._send_json(200, store.leaderboard(self._token()))
                 return
             if method == "POST" and path == "/hangar":
                 body = self._body()
