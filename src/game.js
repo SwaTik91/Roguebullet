@@ -367,6 +367,48 @@ export class Game {
     this.run.fx.push({ kind: "ring", x: cx, y: cy, r: 10, max: 220, life: 0.45, color: "#ffe08a" });
   }
 
+  updateBoss(e, dt) {
+    if (e.bossPhase === undefined) {
+      e.bossPhase = 1;
+      e.summonCd = 0;
+    }
+    const ratio = e.hp / e.maxHp;
+    if (e.bossPhase === 1 && ratio <= 0.66) this.enterBossPhase(e, 2);
+    else if (e.bossPhase === 2 && ratio <= 0.33) this.enterBossPhase(e, 3);
+    if (e.bossPhase === 3) {
+      e.summonCd -= dt;
+      if (e.summonCd <= 0) {
+        e.summonCd = 4;
+        this.summonMinions(e, 6);
+      }
+    }
+  }
+
+  enterBossPhase(e, phase) {
+    e.bossPhase = phase;
+    const shieldPart = phase === 2 ? 0.25 : 0.3;
+    e.shield = e.maxHp * shieldPart;
+    e.maxShield = e.shield;
+    e.speed *= phase === 2 ? 1.4 : 1.3;
+    e.color = phase === 2 ? "#fb923c" : "#ef4444";
+    this.summonMinions(e, phase === 2 ? 10 : 14);
+    this.shake = Math.max(this.shake, 14);
+    this.run.fx.push({ kind: "ring", x: e.x, y: e.y, r: 20, max: e.r * 4, life: 0.6, color: e.color });
+    this.audio.overdrive();
+    this.ui.toast(`БОСС: ФАЗА ${phase}`);
+  }
+
+  summonMinions(e, count) {
+    const hp = Math.max(40, e.maxHp * 0.04);
+    for (let i = 0; i < count; i++) {
+      this.spawnEnemy(
+        { type: "circle", hp, speed: 90, dmg: e.dmg * 0.4, r: 12, color: "#fca5a5", xp: 3, coins: 1 },
+        true,
+        e,
+      );
+    }
+  }
+
   spawnGap() {
     const wave = this.run.wave;
     if (wave % 6 === 0) return 0.95;
@@ -1699,7 +1741,8 @@ export class Game {
       }
       e.x += vx * dt;
       e.y += vy * dt;
-      if (e.shield < e.maxShield) e.shield = Math.min(e.maxShield, e.shield + 4 * dt);
+      if (!e.boss && e.shield < e.maxShield) e.shield = Math.min(e.maxShield, e.shield + 4 * dt);
+      if (e.boss) this.updateBoss(e, dt);
       if (e.healAura) {
         e.healT = (e.healT ?? this.rand() * e.healAura.tick) - dt;
         if (e.healT <= 0) {

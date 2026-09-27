@@ -70,3 +70,20 @@ test("burst elite spawns shards on death", () => {
   game.damage(e, 999, "#7ee8ff", false, false, "gun");
   assert.ok(game.run.enemies.length >= 3, "burst spawned shard enemies");
 });
+
+test("boss enters phases and summons minions as HP drops", () => {
+  const { game } = createBattle({ profile: {}, level: 1, runId: "r" });
+  const tw = game.run.tower;
+  const boss = { type: "boss", boss: true, x: tw.x, y: 60, r: 78, hp: 1000, maxHp: 1000, shield: 0, maxShield: 0, dmg: 18, speed: 28, color: "#f472b6", xp: 80, coins: 28, dead: false, id: 100 };
+  game.run.enemies = [boss];
+  game.update(0.016);
+  assert.equal(boss.bossPhase, 1);
+  boss.hp = 600;
+  game.update(0.016);
+  assert.equal(boss.bossPhase, 2);
+  assert.ok(boss.shield > 0, "phase 2 gives a shield");
+  assert.ok(game.run.enemies.length > 1, "phase 2 summons minions");
+  boss.hp = 300;
+  game.update(0.016);
+  assert.equal(boss.bossPhase, 3);
+});
