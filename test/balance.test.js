@@ -109,3 +109,50 @@ test("laser remains the top area weapon without running away", () => {
   const laser = cluster("laser");
   assert.ok(laser >= 320 && laser <= 460, `laser cluster ${laser}`);
 });
+
+function lcg(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) % 4294967296;
+    return s / 4294967296;
+  };
+}
+
+function playFromScratch(startLevel, seed) {
+  const { game, ui } = createBattle({ profile: {}, level: startLevel, runId: `surv-${startLevel}-${seed}` });
+  game.rand = lcg(seed + startLevel * 7919);
+  const dt = 1 / 60;
+  let cleared = 0;
+  let guard = 0;
+  while (guard++ < 60 * 60 * 30) {
+    if (game.state === "play") {
+      game.update(dt);
+    } else if (game.state === "cards") {
+      const cards = ui.cards || [];
+      if (!cards.length) break;
+      const score = (c) => ({ common: 1, rare: 2, epic: 3, legendary: 4 }[c.rarity] || 1) + (c.unlock ? 1 : 0) + (c.who && c.who !== "Общая карта" ? 1 : 0);
+      game.applyCard(cards.slice().sort((a, b) => score(b) - score(a))[0]);
+    } else if (game.state === "levelclear") {
+      cleared += 1;
+      break;
+    } else {
+      break;
+    }
+  }
+  return cleared >= 1;
+}
+
+test("level 1-1 is beatable from a zero-meta account", () => {
+  // Свежий аккаунт (только gun+drone, без ангара/деталей/крита) обязан
+  // проходить первый уровень на всех сидах — точка входа в игру.
+  for (const seed of [1, 2, 3, 4, 5]) {
+    assert.ok(playFromScratch(1, seed), `1-1 не пройден с нуля на сиде ${seed}`);
+  }
+});
+
+test("difficulty rises: a zero-meta account walls before mid-campaign", () => {
+  // С нуля игрок не должен пробегать всю кампанию без прокачки — иначе
+  // фарм и кристаллы теряют смысл. Уровень 2-1 (абс. 6) уже требует меты.
+  const clears = [1, 2, 3].filter((seed) => playFromScratch(6, seed)).length;
+  assert.ok(clears === 0, `2-1 не должен проходиться с нуля (пройдено ${clears}/3)`);
+});

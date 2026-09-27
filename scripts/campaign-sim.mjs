@@ -22,7 +22,7 @@ function pickCard(cards) {
   return cards.slice().sort((a, b) => score(b) - score(a))[0];
 }
 
-function autoPlay(startLevel, { maxLevels = 40, seed = 1, profile = {} } = {}) {
+function autoPlay(startLevel, { maxLevels = 40, seed = 1, profile = {}, trace = false } = {}) {
   const { game, ui } = createBattle({ profile, level: startLevel, runId: `sim-${startLevel}-${seed}` });
   game.rand = lcg(seed + startLevel * 7919);
   const dt = 1 / 60;
@@ -30,8 +30,14 @@ function autoPlay(startLevel, { maxLevels = 40, seed = 1, profile = {} } = {}) {
   let cleared = 0;
   let guard = 0;
   let deepestWave = 0;
+  let lastWave = 0;
+  if (trace) console.log(`  трасса уровня ${game.run.chapterNum}-${game.run.level} (сид ${seed}):`);
   while (guard++ < maxSteps) {
     if (game.state === "play") {
+      if (trace && game.run.wave !== lastWave) {
+        lastWave = game.run.wave;
+        console.log(`    волна ${lastWave}: ядро ${Math.round(game.run.tower.hp)}/${Math.round(game.run.tower.maxHp)}`);
+      }
       game.update(dt);
       deepestWave = Math.max(deepestWave, game.run.wave);
     } else if (game.state === "cards") {
@@ -112,5 +118,26 @@ for (const start of [1, 3, 5, 6, 10, 15, 20, 30, 40]) {
   const avgCore = Math.round(runs.reduce((s, r) => s + r.core, 0) / runs.length);
   const detail = runs.map((r) => (r.cleared ? "clear" : `die ${r.reached} w${r.reachedWave}`)).join(", ");
   console.log(`уровень ${String(start).padStart(2)}: пройдено ${clears}/3, ср.HP ядра ${avgCore}  [${detail}]`);
+}
+
+console.log("\n=== Трасса уровня 1-1 с нуля (по волнам) ===");
+autoPlay(1, { maxLevels: 1, seed: 1, trace: true });
+
+function maxedProfile() {
+  // Тяжёлый фарм: высокие уровни ангара (atk/hp безлимитны), макс крит/реген, все орудия.
+  return {
+    hangar: { atk: 24, hp: 16, charge: 3, crit: 5, regen: 4, drive: 3 },
+    critBonus: 20,
+    weaponLoadout: ["gun", "drone", "laser", "grenade", "orb"],
+    weapons: ["laser", "grenade", "orb", "scatter", "emp"],
+  };
+}
+
+console.log("\n=== Финальные главы с тяжёлым фармом (ангар atk24/hp16 + крит + 5 орудий) ===");
+for (const start of [15, 20, 30, 36, 40]) {
+  const runs = [1, 2, 3].map((seed) => autoPlay(start, { maxLevels: 1, seed, profile: maxedProfile() }));
+  const clears = runs.filter((r) => r.cleared >= 1).length;
+  const detail = runs.map((r) => (r.cleared ? "clear" : `die ${r.reached} w${r.reachedWave}`)).join(", ");
+  console.log(`уровень ${String(start).padStart(2)}: пройдено ${clears}/3  [${detail}]`);
 }
 

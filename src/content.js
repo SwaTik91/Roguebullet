@@ -228,9 +228,9 @@ export const ENEMY_SPAWN = [
   { minWave: 5, chance: 0.2 },
 ];
 
-export const WAVE_GROWTH = { hpPow: 1.32, chapter: 0.42, dmgPerWave: 0.06 };
+export const WAVE_GROWTH = { hpPow: 1.15, chapter: 0.26, dmgPerWave: 0.05 };
 export const BOSS_EVERY = 6;
-export const BOSS_BASE = { hp: 800, speed: 28, dmg: 18, r: 78, color: "#f472b6", xp: 80, coins: 28 };
+export const BOSS_BASE = { hp: 560, speed: 28, dmg: 18, r: 78, color: "#f472b6", xp: 80, coins: 28 };
 
 export const SPECIAL_ENEMIES = {
   dash: { type: "dash", hp: 42, speed: 80, dmg: 8, r: 14, color: "#f97316", xp: 9, coins: 3, dash: { cd: 2.0, dur: 0.5, mul: 3.2 } },
@@ -247,9 +247,9 @@ export const ELITE = {
   xpMul: 2.5,
   mods: ["armor", "swift", "burst"],
 };
-export const WAVE_COUNT_BASE = 40;
-export const WAVE_COUNT_STEP = 12;
-export const WAVE_COUNT_MULT = 10;
+export const WAVE_COUNT_BASE = 8;
+export const WAVE_COUNT_STEP = 2;
+export const WAVE_COUNT_MULT = 1;
 
 export function endlessEnemyWave(wave) {
   return ((wave - 1) % 5) + 1;

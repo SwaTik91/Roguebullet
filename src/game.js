@@ -226,7 +226,7 @@ export class Game {
       cd: 0,
     };
     run.crit = { chance: CRIT_START.chance + (profile.critBonus || 0) / 100, mul: CRIT_START.mul };
-    run.tower = { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 0, slide: 280, hitCd: 0 };
+    run.tower = { x: this.worldW / 2, y: this.worldH / 2, r: 34, hp, maxHp: hp, regen: 4, slide: 280, hitCd: 0 };
     run.usedCard = false;
     run.dmgByWeapon = {};
     run.syn = {};
@@ -365,7 +365,7 @@ export class Game {
   releaseBoss() {
     const { wave, chapter } = this.run;
     this.run.spawnQueue = [enemyForWave(wave, chapter, 1, this.rand)];
-    const escorts = (26 + chapter * 8) * 10;
+    const escorts = 6 + chapter;
     for (let i = 0; i < escorts; i++) this.run.spawnQueue.push(enemyForWave(3 + (i % 3), chapter, 1, this.rand));
     this.run.spawnTimer = 0.2;
     this.shake = 18;
