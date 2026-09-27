@@ -23,6 +23,7 @@ from server.rewards import (
     hangar_node_price,
     HANGAR_TREE,
     LEADERBOARD_SIZE,
+    MAX_LEVEL,
     ready_achievements,
     roll_chest,
     season_days_left,
@@ -1554,17 +1555,17 @@ def _validate_facts(facts):
         raw_kills = facts.get("kills") or {}
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("Некорректный забег") from exc
-    if levels_cleared not in range(0, 4):
+    if levels_cleared not in range(0, MAX_LEVEL + 1):
         raise ValueError("Некорректный забег")
-    if started_level not in range(1, 4):
+    if started_level not in range(1, MAX_LEVEL + 1):
         raise ValueError("Некорректный забег")
-    if levels_cleared and started_level + levels_cleared - 1 > 3:
+    if levels_cleared and started_level + levels_cleared - 1 > MAX_LEVEL:
         raise ValueError("Некорректный забег")
-    if ended_level not in range(1, 4) or ended_level < started_level:
+    if ended_level not in range(1, MAX_LEVEL + 1) or ended_level < started_level:
         raise ValueError("Некорректный забег")
     if ended_wave not in range(1, 7):
         raise ValueError("Некорректный забег")
-    if waves_cleared not in range(0, 19):
+    if waves_cleared not in range(0, levels_cleared * 6 + 7):
         raise ValueError("Некорректный забег")
     kills = {}
     for kind in ENEMY_COINS:

@@ -3,21 +3,21 @@ import assert from "node:assert/strict";
 import { createBattle } from "../src/battle.js";
 import { enemyForWave } from "../src/content.js";
 
-test("clearing level 3 advances into the next chapter instead of ending", () => {
+test("clearing the last level of a chapter advances into the next chapter", () => {
   const { game } = createBattle({ profile: {}, level: 1, runId: "r" });
   const r = game.run;
   assert.equal(r.chapterNum, 1);
   assert.equal(r.chapter, 1);
-  r.level = 3;
+  r.level = 5;
   game.continueLevel();
   assert.equal(r.chapterNum, 2);
   assert.equal(r.level, 1);
-  assert.equal(r.chapter, 4);
+  assert.equal(r.chapter, 6);
   assert.equal(r.wave, 1);
   assert.equal(game.state, "play");
   game.continueLevel();
   assert.equal(r.level, 2);
-  assert.equal(r.chapter, 5);
+  assert.equal(r.chapter, 7);
 });
 
 test("within a chapter continueLevel just steps the level", () => {
@@ -29,7 +29,7 @@ test("within a chapter continueLevel just steps the level", () => {
   assert.equal(r.chapter, 2);
 });
 
-test("facts stay inside the server's campaign bounds across chapters", () => {
+test("facts report absolute campaign progress within server bounds", () => {
   const { game } = createBattle({ profile: {}, level: 1, runId: "r" });
   const r = game.run;
   r.level = 3;
@@ -37,21 +37,22 @@ test("facts stay inside the server's campaign bounds across chapters", () => {
   r.levelsCleared = 5;
   r.wave = 4;
   const f = game.facts();
-  assert.equal(f.levelsCleared, 3);
-  assert.equal(f.endedLevel, 3);
-  assert.equal(f.endedWave, 6);
-  assert.equal(f.won, true);
+  assert.equal(f.startedLevel, 1);
+  assert.equal(f.levelsCleared, 5);
+  assert.equal(f.endedLevel, 6);
+  assert.equal(f.endedWave, 4);
 });
 
-test("chapter-one facts are not inflated for a mid-campaign start", () => {
-  const { game } = createBattle({ profile: {}, level: 2, runId: "r2" });
+test("mid-campaign start keeps its started level and absolute ended level", () => {
+  const { game } = createBattle({ profile: {}, level: 7, runId: "r2" });
   const r = game.run;
   r.levelsCleared = 2;
-  r.level = 3;
   const f = game.facts();
   assert.equal(f.levelsCleared, 2);
-  assert.equal(f.endedLevel, 3);
-  assert.equal(f.startedLevel, 2);
+  assert.equal(f.startedLevel, 7);
+  assert.equal(f.endedLevel, 9);
+  assert.equal(r.chapterNum, 2);
+  assert.equal(r.level, 2);
 });
 
 test("advancing to a new level resets the in-run build, endless keeps it", () => {

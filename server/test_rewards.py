@@ -44,10 +44,20 @@ class RewardTests(unittest.TestCase):
     def test_first_clear_pays_once_and_names_auto_achievements(self):
         levels, crystals, autos = first_clear_crystals(set(), 3)
         self.assertEqual(levels, [1, 2, 3])
-        self.assertEqual(crystals, 8 + 12 + 20)
+        self.assertEqual(crystals, 6 + 6 + 6)
         self.assertEqual(autos, ["first_boss", "three_levels"])
         again, crystals2, autos2 = first_clear_crystals({1, 2, 3}, 3)
         self.assertEqual((again, crystals2, autos2), ([], 0, []))
+
+    def test_finishing_a_chapter_grants_the_chapter_bonus_and_achievement(self):
+        levels, crystals, autos = first_clear_crystals({1, 2, 3, 4}, 1, 5)
+        self.assertEqual(levels, [5])
+        self.assertEqual(crystals, 6 + 20)
+        self.assertIn("chapter_1", autos)
+        second = first_clear_crystals({1, 2, 3, 4, 5, 6, 7, 8, 9}, 1, 10)
+        self.assertEqual(second[0], [10])
+        self.assertEqual(second[1], 10 + 30)
+        self.assertIn("chapter_2", second[2])
 
     def test_endless_wave_pays_five_and_rejects_a_bad_level(self):
         self.assertEqual(endless_crystals(1, 1), 5)
@@ -56,14 +66,14 @@ class RewardTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             endless_crystals(0, 1)
         with self.assertRaises(ValueError):
-            validate_endless(4, 1)
+            validate_endless(41, 1)
 
     def test_later_level_pays_only_after_earlier_ones(self):
         levels, crystals, autos = first_clear_crystals(set(), 1, 3)
         self.assertEqual((levels, crystals, autos), ([], 0, []))
         levels, crystals, autos = first_clear_crystals({1}, 2, 2)
         self.assertEqual(levels, [2, 3])
-        self.assertEqual(crystals, 12 + 20)
+        self.assertEqual(crystals, 6 + 6)
         self.assertEqual(autos, ["three_levels"])
 
 

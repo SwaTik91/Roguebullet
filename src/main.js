@@ -33,7 +33,7 @@ const ui = {
   },
   updateHud(run) {
     $("hud-wave").textContent = String(run.wave);
-    $("hud-chapter").textContent = String(run.chapter);
+    $("hud-chapter").textContent = `${run.chapterNum || 1}-${run.level}`;
     $("hud-coins").textContent = String(run.coins);
     $("hud-crit").textContent = `${Math.round((run.crit?.chance || 0) * 100)}%`;
     this.setCore(run);
@@ -232,6 +232,14 @@ const ACHIEVEMENT_TITLES = {
   chest_10: "Кладоискатель",
   endless_10: "Орда: 10 волн",
   endless_25: "Орда: 25 волн",
+  chapter_1: "Глава 1 пройдена",
+  chapter_2: "Глава 2 пройдена",
+  chapter_3: "Глава 3 пройдена",
+  chapter_4: "Глава 4 пройдена",
+  chapter_5: "Глава 5 пройдена",
+  chapter_6: "Глава 6 пройдена",
+  chapter_7: "Глава 7 пройдена",
+  chapter_8: "Глава 8 пройдена",
 };
 const PART_RARITY_LABELS = {
   legendary: "ЛЕГЕНДАРКА",
@@ -896,27 +904,56 @@ function dropText(drop) {
   return "";
 }
 
-const LEVEL_CRYSTALS = { 1: 8, 2: 12, 3: 20 };
+const LEVELS_PER_CHAPTER = 5;
+const CAMPAIGN_CHAPTERS = 8;
 
-function levelOpen(level) {
+function levelClearCrystals(abs) {
+  return 6 + Math.floor((abs - 1) / LEVELS_PER_CHAPTER) * 4;
+}
+
+function chapterBonusCrystals(chapter) {
+  return 20 + (chapter - 1) * 10;
+}
+
+function levelOpen(abs) {
   const cleared = new Set(profile?.clearedLevels || []);
-  return level === 1 || cleared.has(level - 1);
+  return abs === 1 || cleared.has(abs - 1);
+}
+
+function chapterCleared(chapter, cleared) {
+  for (let sub = 1; sub <= LEVELS_PER_CHAPTER; sub++) {
+    if (!cleared.has((chapter - 1) * LEVELS_PER_CHAPTER + sub)) return false;
+  }
+  return true;
 }
 
 function renderLevels() {
   const cleared = new Set(profile?.clearedLevels || []);
-  $("level-list").innerHTML = [1, 2, 3]
-    .map((level) => {
-      const open = levelOpen(level);
-      const done = cleared.has(level);
+  let maxChapter = 1;
+  for (let ch = 1; ch < CAMPAIGN_CHAPTERS; ch++) {
+    if (chapterCleared(ch, cleared)) maxChapter = ch + 1;
+  }
+  const blocks = [];
+  for (let ch = 1; ch <= maxChapter; ch++) {
+    const done = chapterCleared(ch, cleared);
+    blocks.push(
+      `<div class="chapter-head"><h3>Глава ${ch}</h3><span class="sub">${done ? "Пройдена" : `За главу: +${chapterBonusCrystals(ch)} кристаллов`}</span></div>`,
+    );
+    for (let sub = 1; sub <= LEVELS_PER_CHAPTER; sub++) {
+      const abs = (ch - 1) * LEVELS_PER_CHAPTER + sub;
+      const open = levelOpen(abs);
+      const cl = cleared.has(abs);
       const note = !open
         ? "Сначала пройди предыдущий"
-        : done
-          ? "Пройден. С него можно начать снова."
-          : `Первый раз: ${LEVEL_CRYSTALS[level]} кристаллов`;
-      return `<div class="upgrade"><div><strong>Уровень ${level}</strong><div class="sub">${note}</div></div><button data-level="${level}" ${open ? "" : "disabled"}>${open ? "В БОЙ" : "ЗАКРЫТ"}</button></div>`;
-    })
-    .join("");
+        : cl
+          ? "Пройден. Можно начать снова."
+          : `Первый раз: +${levelClearCrystals(abs)} кристаллов`;
+      blocks.push(
+        `<div class="upgrade"><div><strong>${ch}-${sub}</strong><div class="sub">${note}</div></div><button data-level="${abs}" ${open ? "" : "disabled"}>${open ? "В БОЙ" : "ЗАКРЫТ"}</button></div>`,
+      );
+    }
+  }
+  $("level-list").innerHTML = blocks.join("");
   $("level-list").querySelectorAll("button").forEach((btn) => {
     btn.onclick = () => beginBattle(Number(btn.dataset.level));
   });

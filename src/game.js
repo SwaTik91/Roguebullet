@@ -13,7 +13,9 @@ const PENDING_PART_ROLL_KEY = "roguebullet-pending-part-roll";
 const gatling = typeof Image === "undefined" ? null : new Image();
 if (gatling) gatling.src = "/gatling.png";
 
-const LEVELS = 3;
+const LEVELS = 5;
+const CHAPTERS = 8;
+const MAX_LEVEL = LEVELS * CHAPTERS;
 const ELITE_COLORS = { armor: "#7dd3fc", swift: "#f97316", burst: "#ffe08a" };
 export const OFFER_XP_MULT = 5;
 export const HANGAR_ATK_STEP = 0.12;
@@ -234,13 +236,15 @@ export class Game {
   }
 
   async startRun(level = 1) {
-    const startLevel = Math.min(3, Math.max(1, Number(level) || 1));
+    const startAbs = Math.min(MAX_LEVEL, Math.max(1, Number(level) || 1));
+    const chapterNum = Math.floor((startAbs - 1) / LEVELS) + 1;
+    const sub = ((startAbs - 1) % LEVELS) + 1;
     this.run = {
       runId: newId(),
-      startedLevel: startLevel,
-      level: startLevel,
-      chapter: startLevel,
-      chapterNum: 1,
+      startedLevel: startAbs,
+      level: sub,
+      chapter: startAbs,
+      chapterNum,
       wave: 1,
       kills: { circle: 0, triangle: 0, square: 0, hex: 0, diamond: 0, dash: 0, heal: 0, split: 0, boss: 0 },
       wavesCleared: 0,
@@ -1375,17 +1379,19 @@ export class Game {
     r.levelsCleared += 1;
     this.state = "levelclear";
     const coins = r.coins - (r.levelCoins || 0);
-    const first = { 1: 8, 2: 12, 3: 20 };
+    const abs = ((r.chapterNum || 1) - 1) * LEVELS + r.level;
     const cleared = new Set(this.profile?.clearedLevels || []);
-    const crystals = cleared.has(r.level) ? 0 : first[r.level] || 0;
+    let crystals = cleared.has(abs) ? 0 : 6 + Math.floor((abs - 1) / LEVELS) * 4;
+    const chapterDone = r.level >= LEVELS;
+    if (chapterDone && !cleared.has(abs)) crystals += 20 + ((r.chapterNum || 1) - 1) * 10;
     this.audio.win();
     this.ui.showLevelClear({
       level: r.level,
       chapter: r.chapterNum || 1,
       coins,
       crystals,
-      canNext: r.level < LEVELS,
-      chapterDone: r.level >= LEVELS,
+      canNext: (r.chapterNum || 1) < CHAPTERS || r.level < LEVELS,
+      chapterDone,
     });
     void this.requestLevelPartRoll();
   }
@@ -1458,7 +1464,7 @@ export class Game {
       return;
     }
     const r = this.run;
-    const won = r.levelsCleared >= LEVELS && (r.startedLevel || 1) === 1;
+    const won = r.levelsCleared >= 1;
     this.end(won, won ? "cleared" : "quit");
   }
 
@@ -1478,17 +1484,17 @@ export class Game {
   facts() {
     const run = this.run;
     const startedLevel = run.startedLevel || 1;
-    const maxCampaign = Math.max(0, LEVELS - (startedLevel - 1));
-    const chapterOne = (run.chapterNum || 1) === 1;
+    const levelsCleared = Math.max(0, Math.min(MAX_LEVEL, run.levelsCleared || 0));
+    const endedLevel = Math.min(MAX_LEVEL, startedLevel + levelsCleared);
     return {
       runId: run.runId,
       startedLevel,
       kills: { ...run.kills },
-      wavesCleared: Math.min(18, run.wavesCleared),
-      levelsCleared: chapterOne ? Math.min(run.levelsCleared, maxCampaign) : maxCampaign,
-      endedLevel: chapterOne ? Math.min(LEVELS, Math.max(startedLevel, run.level)) : LEVELS,
-      endedWave: chapterOne ? Math.min(6, run.wave) : 6,
-      won: !!run.won || !chapterOne,
+      wavesCleared: Math.min(levelsCleared * 6 + 6, run.wavesCleared),
+      levelsCleared,
+      endedLevel: Math.max(startedLevel, endedLevel),
+      endedWave: Math.min(6, run.wave),
+      won: !!run.won,
     };
   }
 
@@ -1514,7 +1520,7 @@ export class Game {
     const absLevel = ((run.chapterNum || 1) - 1) * LEVELS + run.level;
     const progress = (absLevel - 1) * 6 + run.wave;
     this.meta.bestWave = Math.max(this.meta.bestWave, progress);
-    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, win ? LEVELS : run.level);
+    this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, absLevel);
     this.recordCollection(run);
     this.ui.save();
     const facts = this.facts();

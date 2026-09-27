@@ -569,6 +569,25 @@ h2 {
   background: rgba(94, 234, 255, 0.12);
 }
 
+.chapter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.chapter-head h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.chapter-head .sub {
+  margin: 0;
+  font-size: 11px;
+}
+
 .part-cell.rarity-rare {
   border-color: var(--cyan);
 }

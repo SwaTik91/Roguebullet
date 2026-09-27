@@ -37,12 +37,34 @@ def apply_account_xp(level, xp, gained):
     return level, xp, crystals
 
 
+LEVELS_PER_CHAPTER = 5
+CHAPTERS = 8
+MAX_LEVEL = LEVELS_PER_CHAPTER * CHAPTERS
+
+
+def level_clear_crystals(level):
+    return 6 + ((int(level) - 1) // LEVELS_PER_CHAPTER) * 4
+
+
+def chapter_bonus_crystals(chapter):
+    return 20 + (int(chapter) - 1) * 10
+
+
+def chapter_of(level):
+    return (int(level) - 1) // LEVELS_PER_CHAPTER + 1
+
+
+def chapter_levels(chapter):
+    start = (int(chapter) - 1) * LEVELS_PER_CHAPTER + 1
+    return set(range(start, start + LEVELS_PER_CHAPTER))
+
+
 def levels_in_run(started_level, levels_cleared, already):
     owned = set(already)
     played = []
     for offset in range(int(levels_cleared)):
         level = int(started_level) + offset
-        if level < 1 or level > 3:
+        if level < 1 or level > MAX_LEVEL:
             break
         if not set(range(1, level)).issubset(owned | set(played)):
             break
@@ -55,16 +77,21 @@ def first_clear_crystals(already, levels_cleared, started_level=1):
     new_levels = []
     crystals = 0
     autos = []
-    payout = {1: 8, 2: 12, 3: 20}
     for level in levels_in_run(started_level, levels_cleared, owned):
         if level in owned:
             continue
         new_levels.append(level)
-        crystals += payout[level]
+        crystals += level_clear_crystals(level)
         if level == 1:
             autos.append("first_boss")
         if level == 3:
             autos.append("three_levels")
+    cleared_after = owned | set(new_levels)
+    for chapter in range(1, CHAPTERS + 1):
+        levels = chapter_levels(chapter)
+        if levels & set(new_levels) and levels.issubset(cleared_after):
+            crystals += chapter_bonus_crystals(chapter)
+            autos.append(f"chapter_{chapter}")
     return new_levels, crystals, autos
 
 
@@ -88,6 +115,14 @@ ACHIEVEMENT_CRYSTALS = {
     "chest_10": 12,
     "endless_10": 8,
     "endless_25": 20,
+    "chapter_1": 20,
+    "chapter_2": 30,
+    "chapter_3": 40,
+    "chapter_4": 50,
+    "chapter_5": 60,
+    "chapter_6": 70,
+    "chapter_7": 80,
+    "chapter_8": 90,
 }
 WEAPONS = ("laser", "scatter", "grenade", "emp", "orb", "drone")
 COMMON_CARDS = ("Калибр", "Темп", "Сервопривод", "Пластины")
@@ -137,6 +172,9 @@ def ready_achievements(stats, claimed):
         ready.append("endless_10")
     if best_endless >= 25:
         ready.append("endless_25")
+    for chapter in range(1, CHAPTERS + 1):
+        if chapter_levels(chapter).issubset(cleared):
+            ready.append(f"chapter_{chapter}")
     owned = set(claimed)
     return [item for item in ready if item not in owned]
 
@@ -146,7 +184,7 @@ def achievement_crystals(achievement_id):
 
 
 def validate_endless(level, wave):
-    if type(level) is not int or level not in range(1, 4):
+    if type(level) is not int or level not in range(1, MAX_LEVEL + 1):
         raise ValueError("Некорректный уровень")
     if type(wave) is not int or wave not in range(1, 41):
         raise ValueError("Некорректная волна")

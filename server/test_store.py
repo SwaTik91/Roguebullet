@@ -38,7 +38,7 @@ class StoreTests(unittest.TestCase):
         first = self.store.claim_run(token, facts, now)
         second = self.store.claim_run(token, facts, now)
         self.assertEqual(first, second)
-        self.assertEqual(first["granted"]["crystals"], 8 + 8 + 4)
+        self.assertEqual(first["granted"]["crystals"], 6 + 8 + 4)
         self.assertEqual(first["granted"]["coins"], 36)
         self.assertEqual(first["profile"]["clearedLevels"], [1])
         self.assertEqual(first["profile"]["accountLevel"], 2)
@@ -289,6 +289,23 @@ class StoreTests(unittest.TestCase):
             self.store.upgrade_part(broke, "ada-part")
         self.assertEqual(str(ctx.exception), "Мало кристаллов")
 
+    def test_clearing_a_full_chapter_awards_chapter_bonus(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        facts = {
+            "runId": "chapter-run",
+            "kills": {"circle": 1},
+            "wavesCleared": 30,
+            "levelsCleared": 5,
+            "startedLevel": 1,
+            "endedLevel": 5,
+            "endedWave": 6,
+            "won": True,
+        }
+        result = self.store.claim_run(token, facts, "2026-09-23T12:00:00+03:00")
+        self.assertEqual(result["profile"]["clearedLevels"], [1, 2, 3, 4, 5])
+        chapter = next(a for a in result["profile"]["achievements"] if a["id"] == "chapter_1")
+        self.assertTrue(chapter["claimed"])
+
     def test_weapon_loadout_defaults_and_validation(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         profile = self.store.account_for_token(token)
@@ -458,7 +475,7 @@ class HandlerTests(unittest.TestCase):
         status, repeat = call(handler_cls, "POST", "/endless", {"level": 2, "wave": 40}, token)
         self.assertEqual(repeat["granted"], 0)
         self.assertEqual(repeat["crystals"], claimed["crystals"])
-        status, bad = call(handler_cls, "POST", "/endless", {"level": 9, "wave": 1}, token)
+        status, bad = call(handler_cls, "POST", "/endless", {"level": 99, "wave": 1}, token)
         self.assertEqual(status, 400)
         self.assertEqual(bad, {"error": "Некорректный уровень"})
         os.remove(store.path)
