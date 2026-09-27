@@ -900,6 +900,10 @@ h2 {
   color: var(--muted);
 }
 
+.upgrade.locked {
+  opacity: 0.6;
+}
+
 .result-report {
   width: min(460px, 100%);
   text-align: left;

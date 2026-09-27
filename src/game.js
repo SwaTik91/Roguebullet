@@ -6,6 +6,7 @@ import { api, newId } from "./api.js";
 import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
 import { sumBonuses, applyBonuses, partFamilyLabel } from "./parts.js";
 import { synergyFlags, activeSynergies } from "./synergy.js";
+import { applyHangarTree } from "./hangar.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const PENDING_PART_ROLL_KEY = "roguebullet-pending-part-roll";
@@ -258,6 +259,7 @@ export class Game {
       syn: {},
     };
     applyBonuses(this.run, sumBonuses(profile.parts || [], profile.loadout || []));
+    applyHangarTree(this.run, hangar);
     this.refreshSynergies();
     this.state = "play";
     this.paused = false;

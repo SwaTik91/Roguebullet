@@ -262,6 +262,32 @@ class StoreTests(unittest.TestCase):
             self.store.upgrade_part(broke, "ada-part")
         self.assertEqual(str(ctx.exception), "Мало кристаллов")
 
+    def test_hangar_tree_nodes_require_base_and_cap_out(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        self.store.db.execute("UPDATE accounts SET coins = 100000")
+        self.store.db.commit()
+
+        with self.assertRaises(ValueError) as ctx:
+            self.store.buy_hangar(token, "crit")
+        self.assertEqual(str(ctx.exception), "Ветка ещё закрыта")
+
+        self.store.buy_hangar(token, "atk")
+        result = self.store.buy_hangar(token, "atk")
+        self.assertEqual(result["profile"]["hangar"]["atk"], 2)
+
+        bought = self.store.buy_hangar(token, "crit")
+        self.assertEqual(bought["profile"]["hangar"]["crit"], 1)
+        for _ in range(4):
+            bought = self.store.buy_hangar(token, "crit")
+        self.assertEqual(bought["profile"]["hangar"]["crit"], 5)
+        with self.assertRaises(ValueError) as ctx:
+            self.store.buy_hangar(token, "crit")
+        self.assertEqual(str(ctx.exception), "Уже максимум")
+
+        with self.assertRaises(ValueError) as ctx:
+            self.store.buy_hangar(token, "nope")
+        self.assertEqual(str(ctx.exception), "Неизвестное улучшение")
+
     def test_dev_is_denied_for_non_testers(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         with self.assertRaises(ValueError) as ctx:

@@ -9,6 +9,7 @@ import { canUpgrade, upgradeCost as partUpgradeCost, salvageValue } from "./salv
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
 import { activeSynergies, SYNERGIES } from "./synergy.js";
+import { HANGAR_TREE, hangarCost, hangarMax, hangarUnlocked, hangarNode } from "./hangar.js";
 import { retryPendingClaims, retryPendingPartRolls } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
@@ -372,13 +373,32 @@ async function purchase(action, rerender) {
 
 function renderHangar() {
   const coins = profile?.coins || 0;
+  const hangar = profile?.hangar || {};
   $("hangar-coins").textContent = String(coins);
-  $("hangar-list").innerHTML = META_UPGRADES.map((u) => {
-    const lvl = profile?.hangar?.[u.key] || 0;
-    const cost = upgradeCost(lvl);
-    return `<div class="upgrade"><div><strong>${u.title}</strong><div class="sub">ур. ${lvl} · ${u.desc}</div></div><button data-key="${u.key}" ${coins < cost ? "disabled" : ""}>${cost}</button></div>`;
+  $("hangar-list").innerHTML = HANGAR_TREE.map((node) => {
+    const lvl = hangar[node.id] || 0;
+    const max = hangarMax(node.id);
+    const unlocked = hangarUnlocked(hangar, node.id);
+    const maxed = lvl >= max;
+    const cost = hangarCost(node.id, lvl);
+    const levelText = Number.isFinite(max) ? `ур. ${lvl}/${max}` : `ур. ${lvl}`;
+    let label;
+    let disabled;
+    if (!unlocked) {
+      const req = node.requires;
+      const reqNode = hangarNode(req.node);
+      label = `🔒 ${reqNode?.title || req.node} ур. ${req.level}`;
+      disabled = true;
+    } else if (maxed) {
+      label = "МАКС";
+      disabled = true;
+    } else {
+      label = String(cost);
+      disabled = coins < cost;
+    }
+    return `<div class="upgrade${unlocked ? "" : " locked"}"><div><strong>${node.title}</strong><div class="sub">${levelText} · ${node.desc}</div></div><button data-key="${node.id}" ${disabled ? "disabled" : ""}>${label}</button></div>`;
   }).join("");
-  $("hangar-list").querySelectorAll("button").forEach((btn) => {
+  $("hangar-list").querySelectorAll("button[data-key]").forEach((btn) => {
     btn.onclick = () => purchase(() => api.buyHangar(btn.dataset.key), renderHangar);
   });
 }

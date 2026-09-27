@@ -20,6 +20,8 @@ from server.rewards import (
     reroll_price,
     first_clear_crystals,
     hangar_price,
+    hangar_node_price,
+    HANGAR_TREE,
     ready_achievements,
     roll_chest,
     xp_reward,
@@ -167,6 +169,12 @@ class Store:
                 roll_key TEXT NOT NULL,
                 part_id TEXT NOT NULL,
                 PRIMARY KEY (account_id, roll_key)
+            );
+            CREATE TABLE IF NOT EXISTS account_hangar_nodes (
+                account_id INTEGER NOT NULL,
+                node TEXT NOT NULL,
+                level INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (account_id, node)
             );
             CREATE TABLE IF NOT EXISTS guest_ips (
                 ip TEXT NOT NULL,
@@ -452,8 +460,13 @@ class Store:
         return {"used": used, "price": price, "next": reroll_price(used), "profile": profile}
 
     def buy_hangar(self, token, key):
-        if key not in HANGAR_KEYS:
-            raise ValueError("Неизвестное улучшение")
+        if key in HANGAR_KEYS:
+            return self._buy_hangar_legacy(token, key)
+        if key in HANGAR_TREE:
+            return self._buy_hangar_node(token, key)
+        raise ValueError("Неизвестное улучшение")
+
+    def _buy_hangar_legacy(self, token, key):
         account_id = self._account_row(token)["id"]
         column = HANGAR_KEYS[key]
         self.db.execute("BEGIN IMMEDIATE")
@@ -465,6 +478,44 @@ class Store:
             self.db.execute(
                 f"UPDATE accounts SET coins = coins - ?, {column} = {column} + 1, hangar_buys = hangar_buys + 1 WHERE id = ?",
                 (price, account_id),
+            )
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"profile": self._profile(account_id)}
+
+    def _buy_hangar_node(self, token, key):
+        account_id = self._account_row(token)["id"]
+        spec = HANGAR_TREE[key]
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            req_node, req_level = spec["requires"]
+            req_column = HANGAR_KEYS[req_node]
+            if row[req_column] < req_level:
+                raise ValueError("Ветка ещё закрыта")
+            node_row = self.db.execute(
+                "SELECT level FROM account_hangar_nodes WHERE account_id = ? AND node = ?",
+                (account_id, key),
+            ).fetchone()
+            level = int(node_row["level"]) if node_row else 0
+            if level >= spec["max"]:
+                raise ValueError("Уже максимум")
+            price = hangar_node_price(key, level)
+            if row["coins"] < price:
+                raise ValueError("Не хватает монет")
+            self.db.execute(
+                "UPDATE accounts SET coins = coins - ?, hangar_buys = hangar_buys + 1 WHERE id = ?",
+                (price, account_id),
+            )
+            self.db.execute(
+                """
+                INSERT INTO account_hangar_nodes (account_id, node, level)
+                VALUES (?, ?, 1)
+                ON CONFLICT(account_id, node) DO UPDATE SET level = level + 1
+                """,
+                (account_id, key),
             )
             self.db.commit()
         except Exception:
@@ -1108,7 +1159,7 @@ class Store:
             "critBonus": row["crit_bonus"],
             "fourthCard": bool(row["fourth_card"]),
             "weapons": self._weapons(account_id),
-            "hangar": {"atk": row["hangar_atk"], "hp": row["hangar_hp"], "charge": row["hangar_charge"]},
+            "hangar": self._hangar_state(account_id, row),
             "cardQueue": [
                 item["card"]
                 for item in self.db.execute(
@@ -1144,6 +1195,17 @@ class Store:
             "tester": is_tester_name(row["name"]),
             "isGuest": bool(row["is_guest"]),
         }
+
+    def _hangar_state(self, account_id, row):
+        hangar = {"atk": row["hangar_atk"], "hp": row["hangar_hp"], "charge": row["hangar_charge"]}
+        for node in HANGAR_TREE:
+            hangar[node] = 0
+        for item in self.db.execute(
+            "SELECT node, level FROM account_hangar_nodes WHERE account_id = ?",
+            (account_id,),
+        ):
+            hangar[item["node"]] = int(item["level"])
+        return hangar
 
     def _parts_list(self, account_id):
         items = []

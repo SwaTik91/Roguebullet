@@ -45,6 +45,7 @@ import { laserStep } from "../src/laser.js";
 import { orbStep } from "../src/orb.js";
 import { AFFIXES, BASES, PART_RARITY_CUTS, PART_UNIVERSAL_CHANCE, RARITY_STEP, SET_TIERS, describeAffix, partFamilyLabel, setDesc } from "../src/parts.js";
 import { scatterStep } from "../src/scatter.js";
+import { HANGAR_TREE, hangarCost } from "../src/hangar.js";
 import { SALVAGE_CRYSTALS, UPGRADE_COST } from "../src/salvage.js";
 import { SYNERGIES, synergyReqLabels } from "../src/synergy.js";
 import { upgradeCost } from "../src/storage.js";
@@ -278,6 +279,9 @@ function page() {
         <li>Оружие: ${CRYSTAL_SHOP.weaponPrice} кристаллов. Есть с начала каждого забега.</li>
         <li>Четвёртая карта: ${CRYSTAL_SHOP.fourthPrice} кристаллов. В выборе 4 карты вместо 3.</li>
       </ul>
+      <h3>Дерево ангара</h3>
+      <p>Новые ветки открываются, когда прокачаны базовые узлы. Цена растёт с каждым уровнем.</p>
+      <table><thead><tr><th>Узел</th><th>Эффект</th><th>Условие</th><th>Ур.</th><th>Цена 1-го уровня</th></tr></thead><tbody>${HANGAR_TREE.filter((n) => !n.legacy).map((n) => `<tr><td>${esc(n.title)}</td><td>${esc(n.desc)}</td><td>${esc(HANGAR_TREE.find((p) => p.id === n.requires.node)?.title || n.requires.node)} ур. ${n.requires.level}</td><td>${n.max}</td><td>${hangarCost(n.id, 0)} монет</td></tr>`).join("")}</tbody></table>
     </section>
     <section id="waves"><h2>Волны</h2>
       <p>Здоровье растёт как ${WAVE_GROWTH.hpPow} в степени волны и ещё ×${WAVE_GROWTH.chapter} за главу. Урон врага +${Math.round(WAVE_GROWTH.dmgPerWave * 100)}% за волну. Босс на каждой ${BOSS_EVERY}-й волне: ${BOSS_BASE.hp} HP до роста. Обычная волна: (${WAVE_COUNT_BASE} + волна × ${WAVE_COUNT_STEP}) × ${WAVE_COUNT_MULT} врагов. Босс один.</p>

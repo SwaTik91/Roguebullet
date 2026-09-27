@@ -154,6 +154,18 @@ def hangar_price(owned_level):
     return round(40 * math.pow(1.65, int(owned_level)))
 
 
+HANGAR_TREE = {
+    "crit": {"max": 5, "base": 60, "growth": 1.6, "requires": ("atk", 2)},
+    "regen": {"max": 4, "base": 70, "growth": 1.7, "requires": ("hp", 2)},
+    "drive": {"max": 3, "base": 90, "growth": 1.8, "requires": ("charge", 2)},
+}
+
+
+def hangar_node_price(node, level):
+    spec = HANGAR_TREE[node]
+    return round(spec["base"] * math.pow(spec["growth"], int(level)))
+
+
 def buy_crystal_item(profile, kind, weapon=None):
     crystals = int(profile["crystals"])
     crit_bonus = int(profile["crit_bonus"])
