@@ -289,6 +289,26 @@ class StoreTests(unittest.TestCase):
             self.store.upgrade_part(broke, "ada-part")
         self.assertEqual(str(ctx.exception), "Мало кристаллов")
 
+    def test_weapon_loadout_defaults_and_validation(self):
+        token = self.store.register("Ada", "secret-pass")["token"]
+        profile = self.store.account_for_token(token)
+        self.assertEqual(profile["weaponLoadout"], ["gun", "drone", None, None, None])
+
+        with self.assertRaises(ValueError) as ctx:
+            self.store.set_weapon_loadout(token, ["gun", "laser"])
+        self.assertEqual(str(ctx.exception), "Орудие не куплено")
+
+        self.store.db.execute("UPDATE accounts SET crystals = 1000")
+        self.store.db.commit()
+        self.store.buy_shop(token, "weapon", "laser")
+        self.store.buy_shop(token, "weapon", "emp")
+
+        saved = self.store.set_weapon_loadout(token, ["emp", "laser"])
+        self.assertEqual(saved["profile"]["weaponLoadout"], ["gun", "emp", "laser", None, None])
+
+        deduped = self.store.set_weapon_loadout(token, ["laser", "laser", "emp"])
+        self.assertEqual(deduped["profile"]["weaponLoadout"], ["gun", "laser", "emp", None, None])
+
     def test_hangar_tree_nodes_require_base_and_cap_out(self):
         token = self.store.register("Ada", "secret-pass")["token"]
         self.store.db.execute("UPDATE accounts SET coins = 100000")

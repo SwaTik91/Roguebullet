@@ -86,6 +86,10 @@ def make_handler(store, battles=None):
                 body = self._body()
                 self._send_json(200, store.buy_shop(self._token(), body.get("kind"), body.get("weapon")))
                 return
+            if method == "POST" and path == "/weapons/loadout":
+                body = self._body()
+                self._send_json(200, store.set_weapon_loadout(self._token(), body.get("loadout")))
+                return
             if method == "POST" and path == "/chest":
                 body = self._body()
                 self._send_json(200, store.open_chest(self._token(), random.SystemRandom(), body.get("requestId")))

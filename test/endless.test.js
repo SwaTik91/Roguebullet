@@ -2,14 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { applyQueuedCard, endlessEnemyWave, enemyForWave, startingLoadout } from "../src/content.js";
 
-test("crystal weapons start the run and the fourth card is offered", () => {
-  const gear = startingLoadout({ weapons: ["emp", "laser"], fourthCard: true });
+test("loadout weapons start the run and the fourth card is offered", () => {
+  const gear = startingLoadout({ weaponLoadout: ["gun", "drone", "emp", "laser"], fourthCard: true });
   assert.equal(gear.weapons.emp, true);
   assert.equal(gear.weapons.laser, true);
+  assert.equal(gear.weapons.drone, true);
   assert.equal(gear.wepStats.emp.dmg, 16);
   assert.equal(gear.cards, 4);
   const bare = startingLoadout({});
   assert.equal(bare.weapons.emp, undefined);
+  assert.equal(bare.weapons.drone, true);
   assert.equal(bare.cards, 3);
 });
 

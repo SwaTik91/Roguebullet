@@ -35,6 +35,11 @@ from server.rewards import (
 HANGAR_KEYS = {"atk": "hangar_atk", "hp": "hangar_hp", "charge": "hangar_charge"}
 MOSCOW = ZoneInfo("Europe/Moscow")
 DEFAULT_LOADOUT_JSON = "[null,null,null,null,null,null,null,null]"
+WEAPON_SLOTS = 5
+FREE_WEAPONS = ("gun", "drone")
+ALL_WEAPONS = ("gun", "drone", "laser", "scatter", "grenade", "emp", "orb")
+DEFAULT_WEAPON_LOADOUT = ["gun", "drone", None, None, None]
+DEFAULT_WEAPON_LOADOUT_JSON = json.dumps(DEFAULT_WEAPON_LOADOUT)
 PART_RARITY_ORDER = ["common", "rare", "epic", "legendary"]
 PART_RARITY_STEP = {"common": 1, "rare": 2, "epic": 3, "legendary": 4}
 SALVAGE_CRYSTALS = {"common": 3, "rare": 8, "epic": 18, "legendary": 40}
@@ -227,6 +232,11 @@ class Store:
             """
         )
         self._ensure_column("accounts", "loadout_json", f"TEXT NOT NULL DEFAULT '{DEFAULT_LOADOUT_JSON}'")
+        self._ensure_column(
+            "accounts",
+            "weapon_loadout_json",
+            f"TEXT NOT NULL DEFAULT '{DEFAULT_WEAPON_LOADOUT_JSON}'",
+        )
         self._ensure_column("accounts", "parts_dry", "INTEGER NOT NULL DEFAULT 0")
         self._ensure_column("accounts", "is_guest", "INTEGER NOT NULL DEFAULT 0")
         self._ensure_column("accounts", "best_endless", "INTEGER NOT NULL DEFAULT 0")
@@ -648,6 +658,58 @@ class Store:
             self.db.rollback()
             raise
         return {"profile": self._profile(account_id)}
+
+    def _weapon_loadout(self, account_id, row=None):
+        if row is None:
+            row = self.db.execute(
+                "SELECT weapon_loadout_json FROM accounts WHERE id = ?", (account_id,)
+            ).fetchone()
+        raw = row["weapon_loadout_json"] if row is not None else None
+        try:
+            slots = json.loads(raw) if raw else list(DEFAULT_WEAPON_LOADOUT)
+        except (TypeError, ValueError):
+            slots = list(DEFAULT_WEAPON_LOADOUT)
+        return self._sanitize_weapon_loadout(account_id, slots)
+
+    def _sanitize_weapon_loadout(self, account_id, loadout):
+        owned = set(self._weapons(account_id)) | set(FREE_WEAPONS)
+        slots = [None] * WEAPON_SLOTS
+        slots[0] = "gun"
+        seen = {"gun"}
+        idx = 1
+        for item in loadout or []:
+            if idx >= WEAPON_SLOTS:
+                break
+            if item in (None, "", "gun"):
+                continue
+            if item not in ALL_WEAPONS:
+                raise ValueError("Нет такого орудия")
+            if item not in owned:
+                raise ValueError("Орудие не куплено")
+            if item in seen:
+                continue
+            slots[idx] = item
+            seen.add(item)
+            idx += 1
+        return slots
+
+    def set_weapon_loadout(self, token, loadout):
+        account_id = self._account_row(token)["id"]
+        if not isinstance(loadout, list):
+            raise ValueError("Некорректный лоадаут")
+        slots = self._sanitize_weapon_loadout(account_id, loadout)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            self.db.execute(
+                "UPDATE accounts SET weapon_loadout_json = ? WHERE id = ?",
+                (json.dumps(slots, ensure_ascii=False), account_id),
+            )
+            profile = self._profile(account_id)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return {"profile": profile}
 
     def open_chest(self, token, rng, request_id=None):
         account_id = self._account_row(token)["id"]
@@ -1260,6 +1322,7 @@ class Store:
             "critBonus": row["crit_bonus"],
             "fourthCard": bool(row["fourth_card"]),
             "weapons": self._weapons(account_id),
+            "weaponLoadout": self._weapon_loadout(account_id, row),
             "hangar": self._hangar_state(account_id, row),
             "cardQueue": [
                 item["card"]

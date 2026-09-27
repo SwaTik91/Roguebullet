@@ -156,12 +156,16 @@ export function applyQueuedCard(run, title) {
 }
 
 export function startingLoadout(profile = {}) {
-  const weapons = { gun: true, drone: true };
+  const loadout = Array.isArray(profile.weaponLoadout)
+    ? profile.weaponLoadout
+    : ["gun", "drone"];
+  const weapons = { gun: true };
   const wepStats = {};
-  for (const id of profile.weapons || []) {
-    if (!WEAPON_INFO[id] || id === "gun" || id === "drone") continue;
+  for (const id of loadout) {
+    if (!id || id === "gun") continue;
+    if (!WEAPON_INFO[id]) continue;
     weapons[id] = true;
-    wepStats[id] = defaultWep(id);
+    if (id !== "drone") wepStats[id] = defaultWep(id);
   }
   return { weapons, wepStats, cards: profile.fourthCard ? 4 : 3 };
 }

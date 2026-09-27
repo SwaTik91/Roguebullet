@@ -94,6 +94,16 @@ test("unowned laser can appear and leaves the pool once owned", () => {
   assert.ok(closed.some((c) => c.id === "laser-d"));
 });
 
+test("no new weapon unlock cards appear once five weapons are active", () => {
+  const full = run();
+  full.weapons = { gun: true, drone: true, laser: true, scatter: true, grenade: true };
+  const pool = battlePool(full);
+  assert.equal(pool.some((c) => c.unlock), false);
+  const four = run();
+  four.weapons = { gun: true, drone: true, laser: true, scatter: true };
+  assert.ok(battlePool(four).some((c) => c.unlock));
+});
+
 test("Пластины increases hp", () => {
   const r = run();
   const plates = battlePool(r).find((c) => c.title === "Пластины");

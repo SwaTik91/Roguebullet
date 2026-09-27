@@ -538,6 +538,37 @@ h2 {
   opacity: 0.4;
 }
 
+.loadout-block {
+  width: min(420px, 100%);
+  margin: 4px 0 12px;
+}
+
+.loadout-title {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  margin: 10px 0 4px;
+  color: var(--text);
+}
+
+.weapon-slots,
+.weapon-inv {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.weapon-cell {
+  cursor: pointer;
+}
+
+.weapon-cell.locked {
+  border-color: var(--cyan);
+  opacity: 0.85;
+}
+
+.weapon-cell.equipped {
+  border-color: var(--cyan);
+  background: rgba(94, 234, 255, 0.12);
+}
+
 .part-cell.rarity-rare {
   border-color: var(--cyan);
 }

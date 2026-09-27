@@ -204,6 +204,8 @@ function invested(run, key) {
 export function battlePool(run) {
   const cards = tag(GENERAL, "Общая карта");
   const weapons = run.weapons || {};
+  const weaponCount = Object.values(weapons).filter(Boolean).length;
+  const canUnlock = weaponCount < 5;
 
   if (invested(run, "gun") < 15) cards.push(...tag(withoutOnce(gunPool(run.gun?.branch), run.gun), "Пулемёт"));
 
@@ -213,7 +215,7 @@ export function battlePool(run) {
 
   for (const spec of UNLOCKS) {
     if (!weapons[spec.id]) {
-      cards.push({ ...unlockCard(spec), who: spec.title });
+      if (canUnlock) cards.push({ ...unlockCard(spec), who: spec.title });
       continue;
     }
     if (spec.id !== "drone" && invested(run, spec.id) < 15) cards.push(...tag(secondaryUpgrades(spec.id), spec.title));

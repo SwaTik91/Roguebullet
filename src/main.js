@@ -426,6 +426,7 @@ function renderHangar() {
   const coins = profile?.coins || 0;
   const hangar = profile?.hangar || {};
   $("hangar-coins").textContent = String(coins);
+  renderWeaponLoadout();
   $("hangar-list").innerHTML = HANGAR_TREE.map((node) => {
     const lvl = hangar[node.id] || 0;
     const max = hangarMax(node.id);
@@ -452,6 +453,65 @@ function renderHangar() {
   $("hangar-list").querySelectorAll("button[data-key]").forEach((btn) => {
     btn.onclick = () => purchase(() => api.buyHangar(btn.dataset.key), renderHangar);
   });
+}
+
+function weaponSlotCell(id, { locked = false } = {}) {
+  const cell = document.createElement("button");
+  cell.type = "button";
+  cell.className = "part-cell weapon-cell";
+  if (!id) {
+    cell.classList.add("empty");
+    cell.innerHTML = `<span class="cell-glyph">+</span><span class="cell-tag">Пусто</span>`;
+    return cell;
+  }
+  const glyph = FAMILY_GLYPH[id] || FAMILY_GLYPH.common;
+  cell.innerHTML = `<span class="cell-glyph" style="color:${weaponTint(id)}">${glyph}</span><span class="cell-tag">${WEAPON_INFO[id]?.name || id}</span>`;
+  if (locked) cell.classList.add("locked");
+  return cell;
+}
+
+function setWeaponLoadout(next) {
+  purchase(() => api.setWeaponLoadout(next), renderHangar);
+}
+
+function renderWeaponLoadout() {
+  const slotsEl = $("weapon-slots");
+  const invEl = $("weapon-inventory");
+  if (!slotsEl || !invEl) return;
+  const loadout = (Array.isArray(profile?.weaponLoadout) ? profile.weaponLoadout : ["gun", "drone"]).filter(Boolean);
+  const owned = new Set([...(profile?.weapons || []), "gun", "drone"]);
+  const inLoadout = new Set(loadout);
+  slotsEl.innerHTML = "";
+  for (let i = 0; i < 5; i++) {
+    const id = loadout[i] || null;
+    const locked = id === "gun";
+    const cell = weaponSlotCell(id, { locked });
+    if (id && !locked) {
+      cell.onclick = () => setWeaponLoadout(loadout.filter((w) => w !== id));
+    }
+    slotsEl.appendChild(cell);
+  }
+  invEl.innerHTML = "";
+  const arsenal = WEAPON_ORDER.filter((id) => id !== "gun" && owned.has(id));
+  if (!arsenal.length) {
+    invEl.innerHTML = `<p class="sub">Купите орудия в магазине.</p>`;
+    return;
+  }
+  for (const id of arsenal) {
+    const equipped = inLoadout.has(id);
+    const cell = weaponSlotCell(id, { locked: false });
+    if (equipped) cell.classList.add("equipped");
+    cell.onclick = () => {
+      if (equipped) {
+        setWeaponLoadout(loadout.filter((w) => w !== id));
+      } else if (loadout.length < 5) {
+        setWeaponLoadout([...loadout, id]);
+      } else {
+        ui.toast("Максимум 5 орудий");
+      }
+    };
+    invEl.appendChild(cell);
+  }
 }
 
 function partBlock(part) {
@@ -760,7 +820,7 @@ function renderShop() {
     },
     ...SHOP_WEAPONS.map((id) => ({
       title: WEAPON_INFO[id].name,
-      desc: "Есть с начала каждого забега",
+      desc: "Покупается 1 раз. Ставится в ангаре",
       label: owned.has(id) ? "ЕСТЬ" : String(CRYSTAL_SHOP.weaponPrice),
       disabled: owned.has(id) || crystals < CRYSTAL_SHOP.weaponPrice,
       run: () => api.buyShop("weapon", id),

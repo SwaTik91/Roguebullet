@@ -79,6 +79,9 @@ export function createApi({ base, storage, fetch: fetchImpl }) {
       if (weapon) body.weapon = weapon;
       return request("/shop", { method: "POST", body });
     },
+    setWeaponLoadout(loadout) {
+      return request("/weapons/loadout", { method: "POST", body: { loadout } });
+    },
     openChest(requestId) {
       return request("/chest", { method: "POST", body: { requestId } });
     },
