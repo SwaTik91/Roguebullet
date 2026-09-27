@@ -12,6 +12,7 @@ const gatling = typeof Image === "undefined" ? null : new Image();
 if (gatling) gatling.src = "/gatling.png";
 
 const LEVELS = 3;
+const ELITE_COLORS = { armor: "#7dd3fc", swift: "#f97316", burst: "#ffe08a" };
 export const OFFER_XP_MULT = 5;
 export const HANGAR_ATK_STEP = 0.12;
 export const HANGAR_HP_STEP = 40;
@@ -516,6 +517,18 @@ export class Game {
           e,
         );
       }
+    }
+
+    if (e.burstOnDeath) {
+      this.run.fx.push({ kind: "ring", x: e.x, y: e.y, r: 12, max: 170, life: 0.42, color: "#ffe08a" });
+      for (let i = 0; i < 2; i++) {
+        this.spawnEnemy(
+          { type: "circle", hp: e.maxHp * 0.12, speed: 120, dmg: e.dmg * 0.5, r: 11, color: "#fde68a", xp: 2, coins: 1 },
+          true,
+          e,
+        );
+      }
+      this.shake = Math.max(this.shake, 6);
     }
 
     if (this.run.comboType === e.type) this.run.combo += 1;
@@ -1667,6 +1680,19 @@ export class Game {
       }
       let vx = Math.cos(a) * e.speed * slow;
       let vy = Math.sin(a) * e.speed * slow;
+      if (e.dash) {
+        if (e.dashLeft > 0) {
+          e.dashLeft -= dt;
+          vx *= e.dash.mul;
+          vy *= e.dash.mul;
+        } else {
+          e.dashCd = (e.dashCd ?? e.dash.cd) - dt;
+          if (e.dashCd <= 0) {
+            e.dashLeft = e.dash.dur;
+            e.dashCd = e.dash.cd;
+          }
+        }
+      }
       if (e.zigzag) {
         e.phase += dt * 8;
         vx += Math.cos(e.phase) * 70;
@@ -1674,6 +1700,17 @@ export class Game {
       e.x += vx * dt;
       e.y += vy * dt;
       if (e.shield < e.maxShield) e.shield = Math.min(e.maxShield, e.shield + 4 * dt);
+      if (e.healAura) {
+        e.healT = (e.healT ?? this.rand() * e.healAura.tick) - dt;
+        if (e.healT <= 0) {
+          e.healT = e.healAura.tick;
+          const rad = e.healAura.radius;
+          for (const o of r.enemies) {
+            if (o === e || o.dead || o.hp >= o.maxHp) continue;
+            if (dist(e, o) < rad) o.hp = Math.min(o.maxHp, o.hp + e.healAura.hps);
+          }
+        }
+      }
 
       if (e.burn > 0) {
         e.burn -= dt;
@@ -1971,15 +2008,35 @@ export class Game {
       ctx.beginPath();
       ctx.arc(0, 0, e.r, 0, Math.PI * 2);
       ctx.fill();
-    } else if (e.type === "triangle") {
+    } else if (e.type === "triangle" || e.type === "dash") {
       ctx.beginPath();
       ctx.moveTo(0, -e.r);
       ctx.lineTo(e.r, e.r);
       ctx.lineTo(-e.r, e.r);
       ctx.closePath();
       ctx.fill();
+      if (e.type === "dash") {
+        ctx.strokeStyle = "#fff7ed";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -e.r * 0.2);
+        ctx.lineTo(0, e.r * 0.7);
+        ctx.stroke();
+      }
     } else if (e.type === "square") {
       ctx.fillRect(-e.r, -e.r, e.r * 2, e.r * 2);
+    } else if (e.type === "heal") {
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#052e2b";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-e.r * 0.55, 0);
+      ctx.lineTo(e.r * 0.55, 0);
+      ctx.moveTo(0, -e.r * 0.55);
+      ctx.lineTo(0, e.r * 0.55);
+      ctx.stroke();
     } else if (e.type === "diamond") {
       ctx.beginPath();
       ctx.moveTo(0, -e.r);
@@ -1990,6 +2047,18 @@ export class Game {
       ctx.fill();
     } else {
       hex(ctx, 0, 0, e.r, e.color, true);
+    }
+    if (e.elite) {
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 140 + (e.id || 0));
+      ctx.strokeStyle = ELITE_COLORS[e.elite] || "#ffe08a";
+      ctx.shadowColor = ELITE_COLORS[e.elite] || "#ffe08a";
+      ctx.shadowBlur = 16;
+      ctx.globalAlpha = pulse;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     ctx.shadowBlur = 0;
     if (e.hp < e.maxHp || e.shield) {

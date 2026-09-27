@@ -7,6 +7,8 @@ export const SHAPES = {
   square: { glyph: "■", name: "Куб" },
   hex: { glyph: "⬢", name: "Призма" },
   diamond: { glyph: "◆", name: "Щит" },
+  dash: { glyph: "➤", name: "Рывок" },
+  heal: { glyph: "✚", name: "Лекарь" },
   boss: { glyph: "✸", name: "Ядро" },
 };
 
@@ -225,6 +227,22 @@ export const ENEMY_SPAWN = [
 export const WAVE_GROWTH = { hpPow: 1.32, chapter: 0.42, dmgPerWave: 0.06 };
 export const BOSS_EVERY = 6;
 export const BOSS_BASE = { hp: 800, speed: 28, dmg: 18, r: 78, color: "#f472b6", xp: 80, coins: 28 };
+
+export const SPECIAL_ENEMIES = {
+  dash: { type: "dash", hp: 42, speed: 80, dmg: 8, r: 14, color: "#f97316", xp: 9, coins: 3, dash: { cd: 2.0, dur: 0.5, mul: 3.2 } },
+  heal: { type: "heal", hp: 58, speed: 46, dmg: 5, r: 15, color: "#22d3ee", xp: 13, coins: 4, healAura: { radius: 130, hps: 12, tick: 0.5 } },
+};
+export const SPECIAL_SPAWN = { minWave: 3, chance: 0.06, healShare: 0.35 };
+export const ELITE = {
+  minWave: 4,
+  chance: 0.02,
+  hpMul: 2.8,
+  dmgMul: 1.3,
+  rMul: 1.35,
+  coinMul: 3,
+  xpMul: 2.5,
+  mods: ["armor", "swift", "burst"],
+};
 export const WAVE_COUNT_BASE = 40;
 export const WAVE_COUNT_STEP = 12;
 export const WAVE_COUNT_MULT = 10;
@@ -255,9 +273,30 @@ export function enemyForWave(wave, chapter, power = 1, rng = Math.random) {
     const row = ENEMY_SPAWN[i];
     if (wave >= row.minWave && rng() < row.chance) idx = i + 1;
   }
-  const e = { ...ENEMY_KINDS[idx] };
+  let e;
+  if (wave >= SPECIAL_SPAWN.minWave && rng() < SPECIAL_SPAWN.chance) {
+    const base = rng() < SPECIAL_SPAWN.healShare ? SPECIAL_ENEMIES.heal : SPECIAL_ENEMIES.dash;
+    e = { ...base };
+    if (base.dash) e.dash = { ...base.dash };
+    if (base.healAura) e.healAura = { ...base.healAura };
+  } else {
+    e = { ...ENEMY_KINDS[idx] };
+  }
   e.hp *= scale;
   e.dmg *= (1 + (wave - 1) * WAVE_GROWTH.dmgPerWave) * power;
+
+  if (wave >= ELITE.minWave && rng() < ELITE.chance) {
+    const mod = ELITE.mods[Math.floor(rng() * ELITE.mods.length)];
+    e.elite = mod;
+    e.hp *= ELITE.hpMul;
+    e.dmg *= ELITE.dmgMul;
+    e.r = Math.round(e.r * ELITE.rMul);
+    e.coins = Math.round(e.coins * ELITE.coinMul);
+    e.xp = Math.round(e.xp * ELITE.xpMul);
+    if (mod === "armor") e.shield = (e.shield || 0) + e.hp * 0.5;
+    else if (mod === "swift") e.speed *= 1.6;
+    else if (mod === "burst") e.burstOnDeath = true;
+  }
   return e;
 }
 
