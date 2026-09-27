@@ -208,7 +208,7 @@ const HUB_TABS = {
   shop: { screen: "screen-shop", render: () => renderShop() },
   tasks: { screen: "screen-dailies", render: () => renderTasks() },
 };
-const FURTHEST_LEVEL = 3;
+const FURTHEST_LEVEL = 40;
 const SEEN_PARTS_KEY = "roguebullet-seen-parts";
 const SAVE_PROMPT_KEY = "roguebullet-save-prompt-shown";
 const SHOP_WEAPONS = ["laser", "scatter", "grenade", "emp", "orb", "drone"];
@@ -297,7 +297,9 @@ function refreshMenu() {
   $("menu-coins").textContent = String(profile?.coins || 0);
   $("menu-crystals").textContent = String(profile?.crystals || 0);
   const furthest = furthestOpenLevel();
-  $("btn-play").textContent = `В БОЙ · УРОВЕНЬ ${furthest}`;
+  const fchap = Math.floor((furthest - 1) / 5) + 1;
+  const fsub = ((furthest - 1) % 5) + 1;
+  $("btn-play").textContent = `В БОЙ · УРОВЕНЬ ${fchap}-${fsub}`;
   const tester = !!profile?.tester;
   $("btn-coop").hidden = !tester;
   $("btn-dev").hidden = !tester;

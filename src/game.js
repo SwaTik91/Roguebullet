@@ -314,7 +314,7 @@ export class Game {
       .runEnd({
         runId: run.runId,
         outcome,
-        level: run.level,
+        level: ((run.chapterNum || 1) - 1) * LEVELS + run.level,
         wave: run.wave,
         duration: Math.round((performance.now() - (run._startedAt || performance.now())) / 1000),
         kills,
