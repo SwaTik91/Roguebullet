@@ -478,13 +478,12 @@ export class Game {
     return best;
   }
 
-  // Держим текущую цель, пока новая не окажется заметно ближе — иначе прицел
-  // мечется между врагами у ядра и стреляет в пустоту.
+  // Цель держится, пока не умрёт или не уйдёт далеко. Иначе у ядра прицел
+  // прыгает между врагами на одном расстоянии и пули летят мимо.
   stickyTarget(holder, from = holder) {
-    const near = this.nearest(from);
     const cur = holder.target;
-    const keep = cur && !cur.dead && this.run.enemies.includes(cur) && (!near || dist(from, near) > dist(from, cur) * 0.7);
-    holder.target = keep ? cur : near;
+    if (cur && !cur.dead && this.run.enemies.includes(cur) && dist(from, cur) < 560) return cur;
+    holder.target = this.nearest(from);
     return holder.target;
   }
 
@@ -1886,11 +1885,11 @@ export class Game {
         tw.hp -= e.dmg;
         tw.hitCd = e.boss ? 0.35 : 0.45;
         hitCore.hitCd = tw.hitCd;
-        this.shake = Math.max(this.shake, e.boss ? 7 : 3);
+        this.shake = Math.max(this.shake, e.boss ? 6 : 1.2);
         this.burst(hitCore.x, hitCore.y, "#ff5d7a", 8);
         if (!e.boss) {
-          e.x -= Math.cos(a) * 36;
-          e.y -= Math.sin(a) * 36;
+          e.x -= Math.cos(a) * 12;
+          e.y -= Math.sin(a) * 12;
         }
         if (tw.hp <= 0) {
           tw.hp = 0;
@@ -1903,6 +1902,8 @@ export class Game {
     }
 
     for (const b of r.bullets) {
+      const x0 = b.x;
+      const y0 = b.y;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
@@ -1916,7 +1917,7 @@ export class Game {
       }
       for (const e of r.enemies) {
         if (e.dead || b.hit.has(e)) continue;
-        if (dist(b, e) < b.r + e.r) {
+        if (pointLine(e.x, e.y, x0, y0, b.x, b.y) < b.r + e.r) {
           let dmg = b.dmg;
           if (this.run?.syn?.empBurst && b.tag === "gun" && ((e.slow || 0) > 0 || (e.freeze || 0) > 0)) dmg *= 1.4;
           const crit = this.damage(e, dmg, b.color, true, !!b.guaranteedCrit, b.tag);
@@ -2105,7 +2106,7 @@ export class Game {
     const aimAngle = seat ? seat.angle : this.run.gun.angle;
     if (this.state === "play") {
       const manual = seat ? seat.pointer?.down : this.pointer.down;
-      const aim = manual ? (seat ? seat.pointer : this.pointer) : this.nearest(tw);
+      const aim = manual ? (seat ? seat.pointer : this.pointer) : (seat ? seat.target : this.run.gun.target);
       if (aim) {
         ctx.strokeStyle = manual ? "rgba(255,255,255,0.4)" : "rgba(126,232,255,0.28)";
         ctx.setLineDash([5, 7]);
