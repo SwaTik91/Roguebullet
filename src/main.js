@@ -21,6 +21,7 @@ const ui = {
   },
   showPlay() {
     hideAll();
+    setHubChrome(false);
     $("hud").classList.remove("hidden");
     $("build-overlay").classList.add("hidden");
     $("result-report").classList.add("hidden");
@@ -69,6 +70,7 @@ const ui = {
     $("combo-text").textContent = `${names[run.comboType] || "●"} × ${run.combo}`;
   },
   showCards(cards, heading, used = 0) {
+    setHubChrome(false);
     $("screen-cards").classList.remove("hidden");
     if (heading) {
       $("cards-title").textContent = heading.title;
@@ -94,6 +96,7 @@ const ui = {
     $("screen-cards").classList.add("hidden");
   },
   showLevelClear(info) {
+    setHubChrome(false);
     $("hud").classList.add("hidden");
     $("screen-level-clear").classList.remove("hidden");
     $("clear-title").textContent = `УРОВЕНЬ ${info.level} ПРОЙДЕН`;
@@ -134,6 +137,7 @@ const ui = {
     }
   },
   showResult(win, run, granted, extra = {}) {
+    setHubChrome(false);
     $("hud").classList.add("hidden");
     $("build-overlay").classList.add("hidden");
     $("screen-result").classList.remove("hidden");
@@ -241,6 +245,9 @@ function showTab(name) {
   const tab = HUB_TABS[name] || HUB_TABS.play;
   activeTab = HUB_TABS[name] ? name : "play";
   hideAll();
+  $("hud").classList.add("hidden");
+  $("build-overlay").classList.add("hidden");
+  $("result-report").classList.add("hidden");
   setHubChrome(true);
   $(tab.screen).classList.remove("hidden");
   document.querySelectorAll("#tabbar .tab").forEach((btn) => {
