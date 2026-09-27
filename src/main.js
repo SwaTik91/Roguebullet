@@ -2,13 +2,13 @@ import "./style.css";
 import { Game, WEAPON_INFO } from "./game.js";
 import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
-import { CRYSTAL_SHOP, META_UPGRADES, damageShares, weaponColor, weaponLabel } from "./content.js";
+import { CRYSTAL_SHOP, META_UPGRADES, SHAPES, damageShares, weaponColor, weaponLabel } from "./content.js";
 import { api, newId } from "./api.js";
 import { describeAffix, partFamilyLabel, activeSets } from "./parts.js";
 import { canUpgrade, upgradeCost as partUpgradeCost, salvageValue } from "./salvage.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
-import { activeSynergies } from "./synergy.js";
+import { activeSynergies, SYNERGIES } from "./synergy.js";
 import { retryPendingClaims, retryPendingPartRolls } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
@@ -187,6 +187,7 @@ const SCREENS = [
   "screen-shop",
   "screen-dailies",
   "screen-how",
+  "screen-collection",
   "screen-settings",
   "screen-save",
   "screen-dev",
@@ -830,6 +831,42 @@ function openSettings() {
   openScreen("screen-settings");
   refreshSettings();
 }
+
+function collectionChip(label, glyph, unlocked) {
+  const glyphHtml = glyph ? `<span class="coll-glyph">${glyph}</span>` : "";
+  return `<div class="coll-chip${unlocked ? "" : " locked"}">${glyphHtml}<span>${unlocked ? label : "???"}</span></div>`;
+}
+
+function collectionSection(title, items) {
+  const unlocked = items.filter((i) => i.unlocked).length;
+  const chips = items.map((i) => collectionChip(i.label, i.glyph, i.unlocked)).join("");
+  return `<div class="coll-section"><h3>${title} <span class="sub">${unlocked}/${items.length}</span></h3><div class="coll-grid">${chips}</div></div>`;
+}
+
+function renderCollection() {
+  const seen = meta.seen || {};
+  const enemies = new Set(seen.enemies || []);
+  const branches = new Set(seen.branches || []);
+  const synergies = new Set(seen.synergies || []);
+  const partFamilies = new Set((profile?.parts || []).map((p) => p.family || "common"));
+
+  const enemyItems = Object.entries(SHAPES).map(([type, s]) => ({ label: s.name, glyph: s.glyph, unlocked: enemies.has(type) }));
+  const branchItems = Object.entries(BRANCH_LABELS).map(([id, label]) => ({ label, glyph: "", unlocked: branches.has(id) }));
+  const synItems = SYNERGIES.map((s) => ({ label: s.name, glyph: "", unlocked: synergies.has(s.id) }));
+  const famList = ["gun", "drone", "laser", "scatter", "grenade", "emp", "orb", "common"];
+  const partItems = famList.map((f) => ({ label: partFamilyLabel(f === "common" ? null : f), glyph: "", unlocked: partFamilies.has(f) }));
+
+  $("collection-body").innerHTML =
+    collectionSection("Враги", enemyItems) +
+    collectionSection("Ветки оружия", branchItems) +
+    collectionSection("Синергии", synItems) +
+    collectionSection("Семейства запчастей", partItems);
+}
+
+function openCollection() {
+  openScreen("screen-collection");
+  renderCollection();
+}
 function openSaveScreen() {
   openScreen("screen-save");
   $("save-name").value = "";
@@ -846,6 +883,8 @@ $("btn-how2").onclick = () => {
   setHubChrome(false);
   $("screen-how").classList.remove("hidden");
 };
+$("btn-collection").onclick = () => openCollection();
+$("btn-collection-back").onclick = () => openSettings();
 $("btn-save-progress").onclick = () => openSaveScreen();
 $("btn-save-back").onclick = () => showMenu();
 $("btn-save-confirm").onclick = async () => {

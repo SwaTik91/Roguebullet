@@ -5,7 +5,7 @@ import { legendaryOffer, rollBattleOffer, weaponMilestone } from "./draft.js";
 import { api, newId } from "./api.js";
 import { ensureSeats, mulberry32, nearestSeat } from "./coop.js";
 import { sumBonuses, applyBonuses, partFamilyLabel } from "./parts.js";
-import { synergyFlags } from "./synergy.js";
+import { synergyFlags, activeSynergies } from "./synergy.js";
 
 const PENDING_KEY = "roguebullet-pending-run";
 const PENDING_PART_ROLL_KEY = "roguebullet-pending-part-roll";
@@ -1460,6 +1460,20 @@ export class Game {
     };
   }
 
+  recordCollection(run) {
+    const seen = (this.meta.seen = this.meta.seen || {});
+    seen.enemies = seen.enemies || [];
+    seen.branches = seen.branches || [];
+    seen.synergies = seen.synergies || [];
+    for (const [type, n] of Object.entries(run.kills || {})) {
+      if (n > 0 && SHAPES[type] && !seen.enemies.includes(type)) seen.enemies.push(type);
+    }
+    const branches = [run.gun?.branch, run.drone?.branch];
+    for (const st of Object.values(run.wepStats || {})) if (st?.branch) branches.push(st.branch);
+    for (const b of branches) if (b && !seen.branches.includes(b)) seen.branches.push(b);
+    for (const s of activeSynergies(run)) if (!seen.synergies.includes(s.id)) seen.synergies.push(s.id);
+  }
+
   end(win, reason) {
     this.state = "result";
     this.run.won = win;
@@ -1468,6 +1482,7 @@ export class Game {
     const progress = (run.level - 1) * 6 + run.wave;
     this.meta.bestWave = Math.max(this.meta.bestWave, progress);
     this.meta.bestLevel = Math.max(this.meta.bestLevel || 1, win ? LEVELS : run.level);
+    this.recordCollection(run);
     this.ui.save();
     const facts = this.facts();
     rememberPending(facts);
