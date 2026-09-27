@@ -130,6 +130,20 @@ h2 {
   grid-template-columns: repeat(2, 1fr);
 }
 
+.result-grid b {
+  font-size: clamp(18px, 5.4vw, 22px);
+}
+
+#clear-crystals,
+#result-crystals {
+  color: var(--cyan);
+}
+
+#clear-coins,
+#result-coins {
+  color: var(--amber);
+}
+
 .menu-stats div,
 .result-grid div {
   border: 1px solid var(--line);
@@ -403,25 +417,51 @@ h2 {
 }
 
 .card {
+  position: relative;
+  overflow: hidden;
   text-align: left;
   border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(12, 16, 30, 0.92);
-  padding: 14px 16px;
+  padding: 14px 16px 14px 20px;
   color: inherit;
   font: inherit;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--line);
 }
 
 .card.rare {
   border-color: rgba(126, 232, 255, 0.5);
 }
 
+.card.rare::before {
+  background: var(--cyan);
+}
+
 .card.epic {
   border-color: rgba(192, 132, 252, 0.7);
 }
 
+.card.epic::before {
+  background: var(--violet);
+}
+
 .card.legendary {
   border-color: rgba(255, 179, 71, 0.55);
+  background: linear-gradient(90deg, rgba(255, 179, 71, 0.12), rgba(12, 16, 30, 0.92) 60%);
+}
+
+.card.legendary::before {
+  background: var(--amber);
+  box-shadow: 0 0 12px rgba(255, 179, 71, 0.6);
 }
 
 .card-top {
@@ -630,6 +670,46 @@ h2 {
   font-size: 11px;
 }
 
+.level-row {
+  gap: 10px;
+}
+
+.level-node {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: rgba(8, 12, 22, 0.7);
+  font-family: Orbitron, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.level-row.done .level-node {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.level-row:not(.locked):not(.done) .level-node {
+  border-color: var(--amber);
+  color: var(--amber);
+  box-shadow: 0 0 12px rgba(255, 179, 71, 0.3);
+}
+
+.level-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.level-info .sub {
+  margin: 0;
+}
+
 .part-cell.rarity-rare {
   border-color: var(--cyan);
 }
@@ -774,10 +854,33 @@ h2 {
 
 .hub-stats {
   display: flex;
-  gap: 14px;
+  gap: 8px;
   font-size: 13px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--text);
+}
+
+.hub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(12, 16, 28, 0.72);
+}
+
+.hub-pill i {
+  font-style: normal;
+  font-size: 11px;
+}
+
+.hub-pill.gold i {
+  color: var(--amber);
+}
+
+.hub-pill.cyan i {
+  color: var(--cyan);
 }
 
 .hub-stats b {
@@ -820,14 +923,28 @@ h2 {
 .tabbar .tab {
   position: relative;
   flex: 1;
-  padding: 10px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 2px;
   border: none;
   border-radius: 12px;
   background: transparent;
   color: #8ea3b8;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+}
+
+.tabbar .tab-ico {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.tabbar .tab-label {
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 .tabbar .tab.active {
@@ -835,10 +952,14 @@ h2 {
   color: #eaf6ff;
 }
 
+.tabbar .tab.active .tab-ico {
+  filter: drop-shadow(0 0 6px rgba(126, 232, 255, 0.55));
+}
+
 .tabbar .badge {
   position: absolute;
-  top: 6px;
-  right: calc(50% - 26px);
+  top: 5px;
+  right: calc(50% - 24px);
   width: 8px;
   height: 8px;
   border-radius: 50%;

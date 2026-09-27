@@ -949,7 +949,7 @@ function renderLevels() {
           ? "Пройден. Можно начать снова."
           : `Первый раз: +${levelClearCrystals(abs)} кристаллов`;
       blocks.push(
-        `<div class="upgrade"><div><strong>${ch}-${sub}</strong><div class="sub">${note}</div></div><button data-level="${abs}" ${open ? "" : "disabled"}>${open ? "В БОЙ" : "ЗАКРЫТ"}</button></div>`,
+        `<div class="upgrade level-row${cl ? " done" : ""}${open ? "" : " locked"}"><div class="level-node">${ch}-${sub}</div><div class="level-info"><div class="sub">${note}</div></div><button data-level="${abs}" ${open ? "" : "disabled"}>${open ? "В БОЙ" : "ЗАКРЫТ"}</button></div>`,
       );
     }
   }
