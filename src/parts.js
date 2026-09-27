@@ -421,6 +421,89 @@ function applyCap(key, sum, cap) {
   return Math.min(sum, cap);
 }
 
+const FAMILY_DMG_KEY = {
+  gun: "gunDmg",
+  drone: "droneDmg",
+  laser: "laserDmg",
+  scatter: "scatterDmg",
+  grenade: "grenadeDmg",
+  emp: "empDmg",
+  orb: "orbDmg",
+};
+
+export const SET_TIERS = [2, 3, 4];
+
+const WEAPON_SET_DMG = { 2: 0.08, 3: 0.16, 4: 0.28 };
+
+const COMMON_SET = {
+  2: { hp: 40 },
+  3: { hp: 40, regen: 0.8 },
+  4: { hp: 40, regen: 0.8, allDmg: 0.06 },
+};
+
+function highestTier(count) {
+  let best = 0;
+  for (const tier of SET_TIERS) if (count >= tier) best = tier;
+  return best;
+}
+
+function familyCounts(parts, slots) {
+  const counts = {};
+  for (const id of slots || []) {
+    if (!id) continue;
+    const part = partById(parts, id);
+    if (!part) continue;
+    const key = part.family || "common";
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
+export function setBonuses(parts, slots) {
+  const out = {};
+  const counts = familyCounts(parts, slots);
+  for (const [fam, count] of Object.entries(counts)) {
+    const tier = highestTier(count);
+    if (!tier) continue;
+    if (fam === "common") {
+      for (const [key, value] of Object.entries(COMMON_SET[tier])) out[key] = (out[key] || 0) + value;
+    } else if (FAMILY_DMG_KEY[fam]) {
+      out[FAMILY_DMG_KEY[fam]] = (out[FAMILY_DMG_KEY[fam]] || 0) + WEAPON_SET_DMG[tier];
+    }
+  }
+  return out;
+}
+
+export function setDesc(family, tier) {
+  if (!tier) return "";
+  if (!family || family === "common") {
+    const parts = [];
+    const bonus = COMMON_SET[tier];
+    if (bonus.hp) parts.push(`+${bonus.hp} HP ядра`);
+    if (bonus.regen) parts.push(`+${formatAffixNumber(bonus.regen)} реген`);
+    if (bonus.allDmg) parts.push(`+${Math.round(bonus.allDmg * 100)}% урона всего оружия`);
+    return parts.join(", ");
+  }
+  return `+${Math.round(WEAPON_SET_DMG[tier] * 100)}% урона (${partFamilyLabel(family).toLowerCase()})`;
+}
+
+export function activeSets(parts, slots) {
+  const counts = familyCounts(parts, slots);
+  const list = [];
+  for (const [fam, count] of Object.entries(counts)) {
+    const tier = highestTier(count);
+    if (!tier) continue;
+    list.push({
+      family: fam === "common" ? null : fam,
+      count,
+      tier,
+      desc: setDesc(fam, tier),
+    });
+  }
+  list.sort((a, b) => b.count - a.count);
+  return list;
+}
+
 export function sumBonuses(parts, slots) {
   const raw = emptyBonuses();
   const caps = {};
@@ -443,6 +526,8 @@ export function sumBonuses(parts, slots) {
     if (caps[key] != null) sum = applyCap(key, sum, caps[key]);
     out[key] = sum;
   }
+  const sets = setBonuses(parts, slots);
+  for (const [key, value] of Object.entries(sets)) out[key] = (out[key] || 0) + value;
   return out;
 }
 

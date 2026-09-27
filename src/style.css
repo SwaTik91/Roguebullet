@@ -815,6 +815,35 @@ h2 {
   color: var(--muted);
 }
 
+.parts-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.parts-sets:empty {
+  display: none;
+}
+
+.set-row {
+  border: 1px solid #2a6b4a;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.set-row b {
+  color: #6ee7b7;
+}
+
+.set-row span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .result-report {
   width: min(460px, 100%);
   text-align: left;

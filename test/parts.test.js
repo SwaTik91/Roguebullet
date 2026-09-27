@@ -165,7 +165,7 @@ test("sumBonuses caps gun damage from two legendary dmg affixes", () => {
   ];
   const slots = ["a", "b", null, null, null, null, null, null];
   const bonuses = sumBonuses(parts, slots);
-  assert.equal(bonuses.gunDmg, 0.32);
+  assert.equal(bonuses.gunDmg, 0.4);
 });
 
 test("sumBonuses hp only from equipped and caps at 150", () => {
@@ -174,7 +174,7 @@ test("sumBonuses hp only from equipped and caps at 150", () => {
   const parts = [mk("h1"), mk("h2"), mk("h3"), mk("h4")];
   assert.equal(sumBonuses(parts, [null, null, null, null, null, null, null, null]).hp, 0);
   assert.equal(sumBonuses(parts, ["h1", null, null, null, null, null, null, null]).hp, 60);
-  assert.equal(sumBonuses(parts, ["h1", "h2", "h3", "h4", null, null, null, null]).hp, 150);
+  assert.equal(sumBonuses(parts, ["h1", "h2", "h3", "h4", null, null, null, null]).hp, 190);
 });
 
 test("applyBonuses updates gun damage and tower hp", () => {

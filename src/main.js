@@ -4,7 +4,7 @@ import { Synth } from "./audio.js";
 import { loadMeta, saveMeta, upgradeCost } from "./storage.js";
 import { CRYSTAL_SHOP, META_UPGRADES, damageShares, weaponColor, weaponLabel } from "./content.js";
 import { api, newId } from "./api.js";
-import { describeAffix, partFamilyLabel } from "./parts.js";
+import { describeAffix, partFamilyLabel, activeSets } from "./parts.js";
 import { nextSpeed, speedLabel } from "./speed.js";
 import { rerollLabel, rerollPrice } from "./reroll.js";
 import { activeSynergies } from "./synergy.js";
@@ -467,7 +467,11 @@ function renderBuild() {
   const partHtml = parts.length
     ? parts.map((p) => `<span class="build-part rarity-${p.rarity || "common"}">${p.baseName || p.base} · ${partFamilyLabel(p.family)}</span>`).join("")
     : '<span class="sub">Нет надетых запчастей</span>';
-  $("build-parts").innerHTML = `${general.length ? `<div class="build-general"><b>Общие карты</b><p>${general.join(", ")}</p></div>` : ""}<div class="build-parts-list"><b>Запчасти</b><div>${partHtml}</div></div>`;
+  const sets = activeSets(profile?.parts || [], profile?.loadout || []);
+  const setHtml = sets.length
+    ? `<div class="build-sets"><b>Сеты</b>${sets.map((s) => `<div class="build-syn"><b>${partFamilyLabel(s.family)} ×${s.count}</b><span>${s.desc}</span></div>`).join("")}</div>`
+    : "";
+  $("build-parts").innerHTML = `${general.length ? `<div class="build-general"><b>Общие карты</b><p>${general.join(", ")}</p></div>` : ""}${setHtml}<div class="build-parts-list"><b>Запчасти</b><div>${partHtml}</div></div>`;
 }
 
 function openBuild() {
@@ -535,6 +539,16 @@ function renderParts() {
     btn.onclick = () =>
       purchase(() => api.unequipPart(Number(btn.dataset.slot)), renderParts);
   });
+
+  const sets = activeSets(parts, loadout);
+  $("parts-sets").innerHTML = sets.length
+    ? `<p class="sub part-group">Активные сеты</p>${sets
+        .map(
+          (s) =>
+            `<div class="set-row"><b>${partFamilyLabel(s.family)} ×${s.count}</b><span>${s.desc}</span></div>`,
+        )
+        .join("")}`
+    : "";
 
   const stash = parts.filter((p) => !equipped.has(p.id));
   if (!stash.length) {

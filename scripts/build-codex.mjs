@@ -43,7 +43,7 @@ import {
 import { GUN_CRIT_CAP, GUN_RATE_CAP, gunPool, gunStep, gunXpToNext } from "../src/gun.js";
 import { laserStep } from "../src/laser.js";
 import { orbStep } from "../src/orb.js";
-import { AFFIXES, BASES, PART_RARITY_CUTS, PART_UNIVERSAL_CHANCE, RARITY_STEP, describeAffix, partFamilyLabel } from "../src/parts.js";
+import { AFFIXES, BASES, PART_RARITY_CUTS, PART_UNIVERSAL_CHANCE, RARITY_STEP, SET_TIERS, describeAffix, partFamilyLabel, setDesc } from "../src/parts.js";
 import { scatterStep } from "../src/scatter.js";
 import { SYNERGIES, synergyReqLabels } from "../src/synergy.js";
 import { upgradeCost } from "../src/storage.js";
@@ -169,10 +169,22 @@ function partsSection(chance, every) {
   const rare = Math.round((PART_RARITY_CUTS.rare - PART_RARITY_CUTS.common) * 100);
   const epic = Math.round((PART_RARITY_CUTS.epic - PART_RARITY_CUTS.rare) * 100);
   const legend = Math.round((1 - PART_RARITY_CUTS.epic) * 100);
+  const setFamilies = ["gun", "drone", "laser", "scatter", "grenade", "emp", "orb", "common"];
+  const setRows = setFamilies
+    .map((family) => {
+      const label = family === "common" ? "Общие" : partFamilyLabel(family);
+      const fam = family === "common" ? null : family;
+      const tiers = SET_TIERS.map((tier) => `${tier} дет.: ${esc(setDesc(fam, tier))}`).join("; ");
+      return `<tr><td>${esc(label)}</td><td>${tiers}</td></tr>`;
+    })
+    .join("");
   return `<section id="parts"><h2>Запчасти</h2>
     <p>Каждый пройденный уровень даёт одну запчасть. В бесконечном режиме бросок на каждой ${every}-й волне после старта режима, шанс ${Math.round(chance * 100)}%.</p>
     <p>Общая деталь выпадает в ${Math.round(PART_UNIVERSAL_CHANCE * 100)}% случаев, иначе семейство купленного оружия. Редкость: обычная ${Math.round(PART_RARITY_CUTS.common * 100)}%, редкая ${rare}%, эпическая ${epic}%, легендарная ${legend}%. Шаг свойства равен редкости: ${Object.entries(RARITY_STEP).map(([id, step]) => `${RARITY[id]} ${step}`).join(", ")}.</p>
     ${blocks}
+    <h3>Сеты</h3>
+    <p>Сет включается, когда надето несколько деталей одного семейства. Бонусы сета не ограничены потолками свойств.</p>
+    <table><thead><tr><th>Семейство</th><th>Бонусы по числу деталей</th></tr></thead><tbody>${setRows}</tbody></table>
   </section>`;
 }
 
