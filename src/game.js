@@ -1303,7 +1303,11 @@ export class Game {
   partRollBody(kind, levelOrWave) {
     const r = this.run;
     if (!r?.runId) return null;
-    if (kind === "level") return { runId: r.runId, kind: "level", level: levelOrWave ?? r.level };
+    if (kind === "level") {
+      const lvl = levelOrWave ?? r.level;
+      const absLevel = ((r.chapterNum || 1) - 1) * LEVELS + lvl;
+      return { runId: r.runId, kind: "level", level: absLevel };
+    }
     if (kind === "endless") {
       const wave = levelOrWave;
       if (!wave || wave % 5 !== 0) return null;
@@ -1315,7 +1319,7 @@ export class Game {
   partRollStillMatches(body) {
     const r = this.run;
     if (!r || r.runId !== body.runId) return false;
-    if (body.kind === "level") return body.level === r.level;
+    if (body.kind === "level") return body.level === ((r.chapterNum || 1) - 1) * LEVELS + r.level;
     if (body.kind === "endless") return body.wave === r.endlessWaves;
     return false;
   }

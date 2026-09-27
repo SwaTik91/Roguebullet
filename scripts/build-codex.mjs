@@ -152,6 +152,8 @@ function weaponSection(weapon, groups) {
 }
 
 function partsSection(chance, every) {
+  const levelChance = readPython("LEVEL_PART_CHANCE");
+  const levelPity = readPython("LEVEL_PART_PITY");
   const families = ["gun", "drone", "laser", "scatter", "grenade", "emp", "orb", "common"];
   const blocks = families
     .map((family) => {
@@ -181,7 +183,7 @@ function partsSection(chance, every) {
     })
     .join("");
   return `<section id="parts"><h2>Запчасти</h2>
-    <p>Каждый пройденный уровень даёт одну запчасть. В бесконечном режиме бросок на каждой ${every}-й волне после старта режима, шанс ${Math.round(chance * 100)}%.</p>
+    <p>За пройденный уровень запчасть выпадает с шансом ${Math.round(levelChance * 100)}%; после ${levelPity} пустых подряд следующая деталь гарантирована. В бесконечном режиме бросок на каждой ${every}-й волне после старта режима, шанс ${Math.round(chance * 100)}%.</p>
     <p>Общая деталь выпадает в ${Math.round(PART_UNIVERSAL_CHANCE * 100)}% случаев, иначе семейство купленного оружия. Редкость: обычная ${Math.round(PART_RARITY_CUTS.common * 100)}%, редкая ${rare}%, эпическая ${epic}%, легендарная ${legend}%. Шаг свойства равен редкости: ${Object.entries(RARITY_STEP).map(([id, step]) => `${RARITY[id]} ${step}`).join(", ")}.</p>
     ${blocks}
     <h3>Сеты</h3>

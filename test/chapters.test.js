@@ -59,3 +59,16 @@ test("deeper chapters scale enemy hp up", () => {
   const deep = enemyForWave(1, 4, 1, () => 0.99);
   assert.ok(deep.hp > early.hp, "chapter 4 enemies are tougher than chapter 1");
 });
+
+test("level part roll keys stay distinct across chapters", () => {
+  const { game } = createBattle({ profile: {}, level: 1, runId: "r" });
+  const chapter1 = game.partRollBody("level");
+  assert.equal(chapter1.level, 1);
+  game.run.level = 3;
+  game.continueLevel();
+  const chapter2 = game.partRollBody("level");
+  assert.equal(chapter2.level, 4);
+  assert.notEqual(chapter1.level, chapter2.level);
+  assert.ok(game.partRollStillMatches(chapter2));
+  assert.ok(!game.partRollStillMatches(chapter1));
+});
