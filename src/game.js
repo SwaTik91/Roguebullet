@@ -478,6 +478,16 @@ export class Game {
     return best;
   }
 
+  // Держим текущую цель, пока новая не окажется заметно ближе — иначе прицел
+  // мечется между врагами у ядра и стреляет в пустоту.
+  stickyTarget(holder, from = holder) {
+    const near = this.nearest(from);
+    const cur = holder.target;
+    const keep = cur && !cur.dead && this.run.enemies.includes(cur) && (!near || dist(from, near) > dist(from, cur) * 0.7);
+    holder.target = keep ? cur : near;
+    return holder.target;
+  }
+
   densest() {
     let best = null;
     let score = -1;
@@ -1568,7 +1578,7 @@ export class Game {
         let targetAng = seat.angle;
         if (focused) targetAng = angTo(seat, seat.pointer);
         else {
-          const nearest = this.nearest(seat);
+          const nearest = this.stickyTarget(seat);
           if (nearest) targetAng = angTo(seat, nearest);
         }
         const diff = normAng(targetAng - seat.angle);
@@ -1586,7 +1596,7 @@ export class Game {
       let targetAng = r.gun.angle;
       if (focused) targetAng = angTo(tw, this.pointer);
       else {
-        const nearest = this.nearest(tw);
+        const nearest = this.stickyTarget(r.gun, tw);
         if (nearest) targetAng = angTo(tw, nearest);
       }
       const diff = normAng(targetAng - r.gun.angle);
@@ -1811,6 +1821,17 @@ export class Game {
       }
       e.x += vx * dt;
       e.y += vy * dt;
+      {
+        // Враг не должен заходить внутрь ядра: пули рождаются у края и иначе проходят мимо.
+        const rim = r.seats ? home : tw;
+        const minD = e.r + (rim.r || tw.r) - 1;
+        const dd = dist(e, rim);
+        if (dd < minD) {
+          const ang = dd > 0.001 ? Math.atan2(e.y - rim.y, e.x - rim.x) : this.rand() * Math.PI * 2;
+          e.x = rim.x + Math.cos(ang) * minD;
+          e.y = rim.y + Math.sin(ang) * minD;
+        }
+      }
       if (!e.boss && e.shield < e.maxShield) e.shield = Math.min(e.maxShield, e.shield + 4 * dt);
       if (e.boss) this.updateBoss(e, dt);
       if (e.healAura) {
@@ -1865,7 +1886,7 @@ export class Game {
         tw.hp -= e.dmg;
         tw.hitCd = e.boss ? 0.35 : 0.45;
         hitCore.hitCd = tw.hitCd;
-        this.shake = 7;
+        this.shake = Math.max(this.shake, e.boss ? 7 : 3);
         this.burst(hitCore.x, hitCore.y, "#ff5d7a", 8);
         if (!e.boss) {
           e.x -= Math.cos(a) * 36;

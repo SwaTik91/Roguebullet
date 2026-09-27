@@ -156,3 +156,33 @@ test("difficulty rises: a zero-meta account walls before mid-campaign", () => {
   const clears = [1, 2, 3].filter((seed) => playFromScratch(6, seed)).length;
   assert.ok(clears === 0, `2-1 не должен проходиться с нуля (пройдено ${clears}/3)`);
 });
+
+test("gun keeps hitting enemies that crowd the core", () => {
+  const { game } = createBattle({ profile: {}, level: 1, runId: "crowd" });
+  const r = game.run;
+  const tw = r.tower;
+  r.weapons = { gun: true };
+  r.wepStats = {};
+  r.drones = [];
+  r.spawnQueue = [];
+  r.crit.chance = 0;
+  game.update(1 / 60);
+  r.enemies = [0, 1.6, 3.14, 4.7].map((a, i) => ({
+    type: "circle", id: 900 + i, x: tw.x + Math.cos(a) * 70, y: tw.y + Math.sin(a) * 70,
+    r: 16, hp: 1e6, maxHp: 1e6, shield: 0, maxShield: 0, dmg: 0, speed: 60, color: "#f00", xp: 1, coins: 0, dead: false,
+  }));
+  const start = r.enemies.reduce((s, e) => s + e.hp, 0);
+  let spin = 0;
+  let prev = r.gun.angle;
+  for (let i = 0; i < 300; i++) {
+    r.spawnQueue = [];
+    game.update(1 / 60);
+    spin += Math.abs(r.gun.angle - prev);
+    prev = r.gun.angle;
+  }
+  for (const e of r.enemies) assert.ok(Math.hypot(e.x - tw.x, e.y - tw.y) >= tw.r + e.r - 2, "враг зашёл внутрь ядра");
+  const dealt = start - r.enemies.reduce((s, e) => s + e.hp, 0);
+  const ideal = r.gun.dmg * r.gun.rate * 5;
+  assert.ok(dealt > ideal * 0.6, `пушка почти не попадает вплотную: ${Math.round(dealt)} из ${Math.round(ideal)}`);
+  assert.ok(spin < 10, `прицел мечется: ${spin.toFixed(1)} рад за 5с`);
+});
