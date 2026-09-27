@@ -101,6 +101,9 @@ export function stepBattle(session, input = {}, now = Date.now()) {
   } else if (input.action === "exit") {
     game.remote = false;
     game.exitAfterLevel();
+  } else if (input.action === "surrender") {
+    game.remote = false;
+    game.end(false, "quit");
   }
   const elapsed = Math.min(0.25, Math.max(0, (now - session.last) / 1000));
   session.last = now;

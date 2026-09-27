@@ -496,6 +496,96 @@ h2 {
   margin: 16px 0;
 }
 
+.cell-grid {
+  width: min(420px, 100%);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.part-cell {
+  aspect-ratio: 1 / 1;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text);
+  font: inherit;
+  padding: 2px;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.part-cell .cell-glyph {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.part-cell .cell-tag {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  color: var(--muted, #9aa4bd);
+  text-align: center;
+}
+
+.part-cell.empty {
+  opacity: 0.4;
+}
+
+.part-cell.rarity-rare {
+  border-color: var(--cyan);
+}
+
+.part-cell.rarity-epic {
+  border-color: var(--violet);
+}
+
+.part-cell.rarity-legendary {
+  border-color: var(--amber);
+}
+
+.part-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(4, 8, 18, 0.6);
+  padding: 16px;
+}
+
+.part-popup.hidden {
+  display: none;
+}
+
+.part-popup-card {
+  width: min(440px, 100%);
+  background: var(--panel);
+  border: 2px solid var(--cyan);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.part-popup-info {
+  margin-bottom: 10px;
+}
+
+.part-popup-close {
+  margin-top: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  font: inherit;
+}
+
 .part-group {
   margin: 8px 0 0;
 }
@@ -699,6 +789,15 @@ h2 {
   font-size: 15px;
   border-color: var(--violet);
   color: var(--violet);
+}
+
+.surrender-btn {
+  right: auto;
+  left: 12px;
+  min-width: 56px;
+  font-size: 14px;
+  border-color: #f87171;
+  color: #f87171;
 }
 
 .build-overlay {

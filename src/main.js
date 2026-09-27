@@ -598,20 +598,19 @@ function renderParts() {
   const loadout = profile?.loadout?.length === 8 ? profile.loadout : Array(8).fill(null);
   const byId = new Map(parts.map((p) => [p.id, p]));
   const equipped = new Set(loadout.filter(Boolean));
+  closePartPopup();
 
-  const slotHtml = loadout
-    .map((id, index) => {
-      const occupied = Boolean(id);
-      const part = occupied ? byId.get(id) : null;
-      const label = !occupied ? '<span class="sub">Пусто</span>' : part ? partBlock(part) : '<span class="sub">Занято</span>';
-      return `<button type="button" class="part-slot${occupied ? "" : " empty"}" data-slot="${index}" ${occupied ? "" : "disabled"}>${label}</button>`;
-    });
-  $("parts-slots").innerHTML = `<p class="sub part-group">Оружейные</p>${slotHtml.slice(0, 4).join("")}<p class="sub part-group">Общие</p>${slotHtml.slice(4).join("")}`;
-
-  $("parts-slots").querySelectorAll("button[data-slot]:not([disabled])").forEach((btn) => {
-    btn.onclick = () =>
-      purchase(() => api.unequipPart(Number(btn.dataset.slot)), renderParts);
-  });
+  const buildSlots = (indices, host) => {
+    host.innerHTML = "";
+    for (const index of indices) {
+      const id = loadout[index];
+      const part = id ? byId.get(id) : null;
+      const cell = partCell(part, { equipped: true, slot: index });
+      host.appendChild(cell);
+    }
+  };
+  buildSlots([0, 1, 2, 3], $("parts-slots-weapon"));
+  buildSlots([4, 5, 6, 7], $("parts-slots-common"));
 
   const sets = activeSets(parts, loadout);
   $("parts-sets").innerHTML = sets.length
@@ -624,33 +623,125 @@ function renderParts() {
     : "";
 
   const stash = parts.filter((p) => !equipped.has(p.id));
+  const list = $("parts-list");
+  list.innerHTML = "";
   if (!stash.length) {
-    $("parts-list").innerHTML = '<p class="sub">Склад пуст.</p>';
+    list.innerHTML = '<p class="sub">Склад пуст.</p>';
     return;
   }
-  $("parts-list").innerHTML = stash
-    .map((part) => {
-      const up = canUpgrade(part.rarity);
-      const upCost = up ? partUpgradeCost(part.rarity) : null;
-      const upDisabled = !up || (profile?.crystals || 0) < upCost;
-      const upLabel = up ? `Улучшить · ${upCost}◆` : "Максимум";
-      return `<div class="upgrade part-row"><div>${partBlock(part)}</div><div class="part-actions"><button data-equip="${part.id}">Надеть</button><button data-up="${part.id}" ${upDisabled ? "disabled" : ""}>${upLabel}</button><button class="salvage-btn" data-salvage="${part.id}">Разобрать · +${salvageValue(part.rarity)}◆</button></div></div>`;
-    })
-    .join("");
-  $("parts-list").querySelectorAll("button[data-equip]").forEach((btn) => {
-    btn.onclick = () => purchase(() => api.equipPart(btn.dataset.equip), renderParts);
+  for (const part of stash) {
+    list.appendChild(partCell(part, { equipped: false }));
+  }
+}
+
+const FAMILY_GLYPH = {
+  gun: "≡",
+  drone: "✜",
+  laser: "↯",
+  scatter: "⁘",
+  grenade: "✸",
+  emp: "◎",
+  orb: "◍",
+  common: "◆",
+};
+
+function partCell(part, ctx) {
+  const cell = document.createElement("button");
+  cell.type = "button";
+  cell.className = "part-cell";
+  if (!part) {
+    cell.classList.add("empty");
+    cell.innerHTML = `<span class="cell-glyph">·</span><span class="cell-tag">Пусто</span>`;
+    return cell;
+  }
+  const rarity = part.rarity || "common";
+  cell.classList.add(`rarity-${rarity}`);
+  const family = part.family || "common";
+  const glyph = FAMILY_GLYPH[family] || FAMILY_GLYPH.common;
+  const color = family === "common" ? "var(--muted, #9aa4bd)" : weaponTint(family);
+  cell.innerHTML = `<span class="cell-glyph" style="color:${color}">${glyph}</span><span class="cell-tag">${partFamilyLabel(family)}</span>`;
+  attachPartCell(cell, {
+    onTap: () => {
+      if (ctx.equipped) purchase(() => api.unequipPart(ctx.slot), renderParts);
+      else purchase(() => api.equipPart(part.id), renderParts);
+    },
+    onHold: () => openPartPopup(part, ctx),
   });
-  $("parts-list").querySelectorAll("button[data-up]:not([disabled])").forEach((btn) => {
-    btn.onclick = () => purchase(() => api.upgradePart(btn.dataset.up), renderParts);
+  return cell;
+}
+
+function weaponTint(family) {
+  const colors = { gun: "#7ee8ff", laser: "#60a5fa", scatter: "#fbbf24", grenade: "#fb7185", emp: "#c084fc", orb: "#34d399", drone: "#f472b6" };
+  return colors[family] || "var(--text)";
+}
+
+function attachPartCell(el, { onTap, onHold }) {
+  let timer = null;
+  let held = false;
+  const start = () => {
+    held = false;
+    timer = setTimeout(() => {
+      held = true;
+      onHold();
+    }, 420);
+  };
+  const cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  el.addEventListener("pointerdown", start);
+  el.addEventListener("pointerup", () => {
+    cancel();
+    if (!held) onTap();
   });
-  $("parts-list").querySelectorAll("button[data-salvage]").forEach((btn) => {
+  el.addEventListener("pointerleave", cancel);
+  el.addEventListener("pointercancel", cancel);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+function openPartPopup(part, ctx) {
+  const popup = $("part-popup");
+  const actions = [];
+  if (ctx.equipped) {
+    actions.push(`<button data-act="unequip">Снять</button>`);
+  } else {
+    actions.push(`<button data-act="equip">Надеть</button>`);
+    const up = canUpgrade(part.rarity);
+    if (up) {
+      const cost = partUpgradeCost(part.rarity);
+      const dis = (profile?.crystals || 0) < cost ? "disabled" : "";
+      actions.push(`<button data-act="upgrade" ${dis}>Улучшить · ${cost}◆</button>`);
+    }
+    actions.push(`<button class="salvage-btn" data-act="salvage">Разобрать · +${salvageValue(part.rarity)}◆</button>`);
+  }
+  popup.innerHTML = `<div class="part-popup-card"><div class="part-popup-info">${partBlock(part)}</div><div class="part-actions">${actions.join("")}</div><button class="part-popup-close" data-act="close">Закрыть</button></div>`;
+  popup.classList.remove("hidden");
+  popup.onclick = (e) => {
+    if (e.target === popup) closePartPopup();
+  };
+  popup.querySelectorAll("button[data-act]").forEach((btn) => {
     btn.onclick = () => {
-      const part = byId.get(btn.dataset.salvage);
-      const gain = part ? salvageValue(part.rarity) : 0;
-      if (!confirm(`Разобрать деталь на +${gain}◆? Это навсегда.`)) return;
-      purchase(() => api.salvagePart(btn.dataset.salvage), renderParts);
+      const act = btn.dataset.act;
+      if (act === "close") return closePartPopup();
+      if (act === "unequip") return purchase(() => api.unequipPart(ctx.slot), renderParts);
+      if (act === "equip") return purchase(() => api.equipPart(part.id), renderParts);
+      if (act === "upgrade") return purchase(() => api.upgradePart(part.id), renderParts);
+      if (act === "salvage") {
+        if (!confirm(`Разобрать деталь на +${salvageValue(part.rarity)}◆? Это навсегда.`)) return;
+        return purchase(() => api.salvagePart(part.id), renderParts);
+      }
     };
   });
+}
+
+function closePartPopup() {
+  const popup = $("part-popup");
+  if (!popup) return;
+  popup.classList.add("hidden");
+  popup.innerHTML = "";
+  popup.onclick = null;
 }
 
 function renderShop() {
@@ -996,6 +1087,11 @@ $("btn-speed").onclick = () => {
 $("btn-build").onclick = () => {
   if ($("build-overlay").classList.contains("hidden")) openBuild();
   else closeBuild();
+};
+$("btn-surrender").onclick = () => {
+  if (!game.run || game.state !== "play") return;
+  if (!confirm("Сдаться и покинуть бой? Награда за пройденное сохранится.")) return;
+  game.surrender();
 };
 $("btn-build-resume").onclick = () => closeBuild();
 $("btn-next-level").onclick = () => game.continueLevel();

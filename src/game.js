@@ -1457,6 +1457,19 @@ export class Game {
     this.end(won, won ? "cleared" : "quit");
   }
 
+  surrender() {
+    if (this.state !== "play" || !this.run) return;
+    if (this.coop?.live && !this._coopEcho) {
+      this.sendCoop({ t: "exit" });
+      return;
+    }
+    if (this.remote) {
+      this.remoteAction = { action: "surrender" };
+      return;
+    }
+    this.end(false, "quit");
+  }
+
   facts() {
     const run = this.run;
     const startedLevel = run.startedLevel || 1;

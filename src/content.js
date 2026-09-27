@@ -169,13 +169,13 @@ export function startingLoadout(profile = {}) {
 export function defaultWep(id) {
   switch (id) {
     case "laser":
-      return { dmg: 36, cd: 0.6, width: 14, timer: 0, branch: null, rays: 1, spread: 0.28, bounces: 0, edgeMul: 1, burn: 0 };
+      return { dmg: 32, cd: 0.6, width: 14, timer: 0, branch: null, rays: 1, spread: 0.28, bounces: 0, edgeMul: 1, burn: 0 };
     case "scatter":
-      return { dmg: 16, cd: 0.8, n: 7, knock: 70, gap: 0.1, pierce: 0, timer: 0, branch: null, centerMul: 1, shards: 0, shardMul: 0.45 };
+      return { dmg: 22, cd: 0.7, n: 8, knock: 70, gap: 0.1, pierce: 0, timer: 0, branch: null, centerMul: 1, shards: 0, shardMul: 0.45 };
     case "grenade":
       return { dmg: 58, cd: 1.45, radius: 100, timer: 0, branch: null, bombs: 0, bombMul: 0.55, poolDmg: 20 };
     case "emp":
-      return { dmg: 14, cd: 2.7, radius: 145, slow: 0.45, slowMul: 0.45, slowDur: 1.7, hits: 1, knock: 0, timer: 0, branch: null };
+      return { dmg: 16, cd: 2.5, radius: 145, slow: 0.45, slowMul: 0.45, slowDur: 1.7, hits: 1, knock: 0, timer: 0, branch: null };
     case "orb":
       return { dmg: 18, count: 3, radius: 104, spin: 2, branch: null, reach: 1, fly: [] };
     case "drone":

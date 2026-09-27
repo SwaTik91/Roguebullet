@@ -37,7 +37,7 @@ test("later laser and emp legendaries stay inside the chosen branch", () => {
   run.pips.emp = Array(14).fill("normal");
   assert.deepEqual(legendaryOffer(run, "emp").map((c) => c.id), ["dm-sky", "dm-fort", "dm-wave"]);
   assert.ok(Math.abs(run.wepStats.emp.radius - 145 * 1.55) < 1e-9);
-  assert.equal(run.wepStats.laser.dmg, 36 * 2);
+  assert.equal(run.wepStats.laser.dmg, 32 * 2);
   assert.equal(run.wepStats.laser.burn, 1);
 });
 

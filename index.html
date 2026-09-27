@@ -54,6 +54,7 @@
         <div id="weapons" class="weapons"></div>
         <button id="btn-build" class="speed-btn build-btn" type="button">Билд</button>
         <button id="btn-speed" class="speed-btn" type="button">×1</button>
+        <button id="btn-surrender" class="speed-btn surrender-btn" type="button">Сдаться</button>
       </div>
 
       <div id="build-overlay" class="build-overlay hidden">
@@ -149,11 +150,15 @@
 
       <div id="screen-parts" class="screen hidden scroll tab-panel">
         <h2>ИНВЕНТАРЬ</h2>
-        <p class="sub">Надетые детали меняют бой. Нажми слот, чтобы снять.</p>
-        <div class="parts-grid" id="parts-slots"></div>
+        <p class="sub">Тап — надеть/снять. Долгое нажатие — описание и действия.</p>
+        <p class="sub part-group">Оружейные слоты</p>
+        <div class="cell-grid" id="parts-slots-weapon"></div>
+        <p class="sub part-group">Общие слоты</p>
+        <div class="cell-grid" id="parts-slots-common"></div>
         <div id="parts-sets" class="parts-sets"></div>
-        <p class="sub">Склад — нажми деталь, чтобы надеть в первый подходящий слот.</p>
-        <div class="upgrade-list" id="parts-list"></div>
+        <p class="sub part-group">Склад</p>
+        <div class="cell-grid" id="parts-list"></div>
+        <div id="part-popup" class="part-popup hidden"></div>
       </div>
 
       <div id="screen-shop" class="screen hidden scroll tab-panel">
