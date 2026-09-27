@@ -805,7 +805,6 @@ $("btn-damage-toggle").onclick = () => {
   ui.save();
   refreshSettings();
 };
-$("btn-how").onclick = () => showMenu();
 $("btn-how2").onclick = () => {
   hideAll();
   setHubChrome(false);
